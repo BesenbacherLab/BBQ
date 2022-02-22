@@ -1,0 +1,18 @@
+# Changes here will be overwritten by Copier
+_src_path: /Users/besen/Projects/Templates/minimal_copier_poetry
+author_email: besenbacher@clin.au.dk
+author_fullname: "S\xF8ren Besenbacher"
+author_username: besenbacher
+copyright_date: '2022'
+copyright_holder: "S\xF8ren Besenbacher"
+copyright_holder_email: besenbacher@clin.au.dk
+copyright_license: MIT License
+project_description: Calculates sample-specific base qualities using overlapping reads.
+project_name: BetterBaseQuals
+python_package_command_line_name: BetterBaseQuals
+python_package_distribution_name: betterbasequals
+python_package_import_name: betterbasequals
+repository_name: BetterBaseQuals
+repository_namespace: besenbacher
+repository_provider: github.com
+use_precommit: false
