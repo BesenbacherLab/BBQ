@@ -24,6 +24,7 @@ def get_parser():
     parser.add_argument("twobit_file", help="Reference genome in two-bit format")
     parser.add_argument("--output_file_good", type=argparse.FileType('w'))
     parser.add_argument("--output_file_bad", type=argparse.FileType('w'))
+    parser.add_argument("--radius", type=int, default=3)
     parser.add_argument('--region','-r',type=str,help='only consider variants in this region')
     return parser
 
@@ -61,14 +62,16 @@ def main(args = None):
         chrom,
         start,
         end,
+        opts.radius,
     )
 
+    super_kmer = 'N'*opts.radius + 'M' + 'N'*opts.radius
     if not opts.output_file_good is None:
-        for kmer in  matches("NNNMNNN"):
+        for kmer in  matches(super_kmer):
             print(kmer, good_kmers, file = opts.output_file_good)
         opts.output_file_good.close()
     if not opts.output_file_bad is None:
-        for kmer in matches("NNNMNNN"):
+        for kmer in matches(super_kmer):
             print(kmer, bad_kmers[kmer], file = opts.output_file_bad)
         opts.output_file_bad.close()
     
