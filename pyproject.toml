@@ -16,6 +16,8 @@ packages = [ { include = "betterbasequals", from = "src" } ]
 
 [tool.poetry.dependencies]
 python = "^3.6"
+pysam = "^0.18.0"
+py2bit = "^0.3.0"
 
 [tool.poetry.dev-dependencies]
 # formatting, quality, tests
