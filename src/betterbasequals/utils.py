@@ -5,10 +5,8 @@ from functools import reduce, partial
 
 complement = str.maketrans("ATCGN", "TAGCN")
 
-
 def reverse_complement(s):
     return s.translate(complement)[::-1]
-
 
 def regions(bed_file):
     with open(bed_file) as fp:
@@ -41,3 +39,27 @@ def generate_mutation_types(k):
     return sorted(types)
 
 mutation_types_3_mer = dict(zip(generate_mutation_types(3), count()))
+
+code = {'A':['A'],
+        'C':['C'],
+        'G':['G'],
+        'T':['T'],
+        'R':['A', 'G'],
+        'Y':['C', 'T'],
+        'S':['G', 'C'],
+        'W':['A', 'T'],
+        'K':['G', 'T'],
+        'M':['A', 'C'],
+        'B':['C', 'G', 'T'],
+        'D':['A', 'G', 'T'],
+        'H':['A', 'C', 'T'],
+        'V':['A', 'C', 'G'],
+        'N':['A', 'C', 'G', 'T']}
+
+def matches(pattern):
+    if len(pattern) == 0:
+        yield ''
+    else:
+        for y in matches(pattern[1:]):
+            for x in code[pattern[0]]:
+                yield x+y

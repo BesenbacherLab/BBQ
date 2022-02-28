@@ -1,16 +1,13 @@
-import argparse
 import pysam
 import py2bit
 import os
 import sys
-import csv
 from collections import Counter
 
-from utils import reverse_complement
+from betterbasequals.utils import reverse_complement
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
-
 
 class Read:
     def __init__(self, pileup_read):
@@ -64,11 +61,11 @@ class ReadPair:
 def zip_pileups(*pileups):
     while True:
         try:
-            pilupcolumns = [None] * len(pileups)
-            for i in range(len(L)):
-                pilupcolumns[i]  = next(pileups[i])
-            for i in range(len(L)):
-                max_pos = max(x.reference_pos for x in pilupcolumns)
+            pileupcolumns = [None] * len(pileups)
+            for i in range(len(pileups)):
+                pileupcolumns[i]  = next(pileups[i])
+            for i in range(len(pileups)):
+                max_pos = max(x.reference_pos for x in pileupcolumns)
                 while pileupcolumns[i].reference_pos < max_pos:
                     pileupcolumns[i] = next(pileups[i])
             if all(x.reference_pos == pileupcolumns[0].reference_pos for x in pileupcolumns):
@@ -161,7 +158,6 @@ def get_pileup_count_double(pileupcolumn, ref, min_base_qual):
                 continue
                 
             # Count alleles
-
             if read.allel == ref:
                 n_ref += 1
             else:
@@ -178,7 +174,7 @@ class MutationFinder:
         self,
         bam_file,
         filter_bam_file,
-        bit_file,
+        twobit_file,
         #output,
     ):
         # Check if index exists, if not create an index file
@@ -279,30 +275,6 @@ class MutationFinder:
                 elif mut_type == "bad":
                     bad_kmers[kmer] += 1
         return good_kmers, bad_kmers
-            
-code = {'A':['A'],
-        'C':['C'],
-        'G':['G'],
-        'T':['T'],
-        'R':['A', 'G'],
-        'Y':['C', 'T'],
-        'S':['G', 'C'],
-        'W':['A', 'T'],
-        'K':['G', 'T'],
-        'M':['A', 'C'],
-        'B':['C', 'G', 'T'],
-        'D':['A', 'G', 'T'],
-        'H':['A', 'C', 'T'],
-        'V':['A', 'C', 'G'],
-        'N':['A', 'C', 'G', 'T']}
-
-def matches(pattern):
-    if len(pattern) == 0:
-        yield ''
-    else:
-        for y in matches(pattern[1:]):
-            for x in code[pattern[0]]:
-                yield x+y
 
 def get_good_and_bad_kmers(bam_file, filter_bam_file, twobit_file, chrom, start, end):
     finder = MutationFinder(bam_file, filter_bam_file, twobit_file)
