@@ -276,10 +276,7 @@ class MutationFinder:
                     bad_kmers[kmer] += 1
         return good_kmers, bad_kmers
 
-def get_good_and_bad_kmers(bam_file, filter_bam_file, twobit_file, chrom, start, end):
+def get_good_and_bad_kmers(bam_file, filter_bam_file, twobit_file, chrom, start, end, radius):
     finder = MutationFinder(bam_file, filter_bam_file, twobit_file)
-    good_kmers, bad_kmers = finder.find_mutations(chrom, start, end)
+    good_kmers, bad_kmers = finder.find_mutations(chrom, start, end, radius=radius)
     return good_kmers, bad_kmers
-
-
-
