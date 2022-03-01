@@ -197,7 +197,7 @@ class MutationFinder:
     def __del__(self):
         self.tb.close()
 
-    def find_mutations(self, chrom, start, stop, mapq=50, mapq_filter=20, min_base_qual=30, min_base_qual_filter=20, radius=3):
+    def find_mutations(self, chrom, start, stop, mapq=50, mapq_filter=20, min_base_qual=30, min_base_qual_filter=20, radius=3, prefix=""):
         good_kmers = Counter()
         bad_kmers = Counter()
         pileup = self.bam_file.pileup(
@@ -221,12 +221,13 @@ class MutationFinder:
             flag_filter=3848,
         )
         for pileupcolumn, filter_pc in zip_pileups(pileup, filter_pileup):
-            print(pileupcolumn.reference_pos, filter_pc.reference_pos)
+            #print(pileupcolumn.reference_pos, filter_pc.reference_pos)
             #print("test", pileupcolumn, filter_pc)
             ref_pos = pileupcolumn.reference_pos
-            chrom = pileupcolumn.reference_name            #if not self.bed_query_func(chrom, ref_pos):
+            chrom = pileupcolumn.reference_name            
+            #if not self.bed_query_func(chrom, ref_pos):
             #    continue
-            ref = self.tb.sequence(chrom, ref_pos, ref_pos + 1)
+            ref = self.tb.sequence(prefix + chrom, ref_pos, ref_pos + 1)
             assert len(ref) == 1
             if ref not in "ATGC":
                 continue
@@ -246,6 +247,9 @@ class MutationFinder:
             n_ref_double, n_alt_double, has_incomp = get_pileup_count_double(pileupcolumn, ref, min_base_qual)
             N_double = n_ref_double + sum(n_alt_double.values())
             
+            #if N_double >0:
+            #    print(chrom, ref_pos)
+            
             for A in [x for x in ['A','C','G','T'] if x != ref]:
                 n_A = n_alt[A]
                 if n_A == 0:
@@ -263,7 +267,7 @@ class MutationFinder:
                 else:
                     continue
                 
-                kmer = self.tb.sequence(chrom, ref_pos- radius, ref_pos + radius + 1)
+                kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
                 if 'N' in kmer:
                     continue
                 
