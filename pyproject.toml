@@ -18,7 +18,7 @@ packages = [ { include = "betterbasequals", from = "src" } ]
 python = ">=3.7,<3.10"
 pysam = "^0.18.0"
 py2bit = "^0.3.0"
-kmerpapa = "^0.2.2"
+kmerpapa = {git = "https://github.com/BesenbacherLab/kmerpapa.git", branch="main"}
 
 [tool.poetry.dev-dependencies]
 # formatting, quality, tests
