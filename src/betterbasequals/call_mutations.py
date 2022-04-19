@@ -122,7 +122,7 @@ class MutationCaller:
                 p = kmer_papa[mtype][kmer]
                 self.correction_factor[mtype][kmer] = -10*log10(p/(p-1))
         
-        self.outfile
+        self.outfile = outfile
 
     def __del__(self):
         self.tb.close()
@@ -189,6 +189,6 @@ class MutationCaller:
                 print(f'{chrom}\t{ref_pos}\t{ref}\t{A}\t{var_qual}\t{len(base_quals)}\t{N}', file=self.outfile)
 
 
-def run_mutation_caller(bam_file, filter_bam_file, twobit_file, chrom, start, end, radius):
-    caller = MutationCaller(bam_file, filter_bam_file, twobit_file)
+def run_mutation_caller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile, chrom, start, end, radius):
+    caller = MutationCaller(bam_file, filter_bam_file, twobit_file, kmer_papa, outfile)
     caller.call_mutations(chrom, start, end, radius=radius)

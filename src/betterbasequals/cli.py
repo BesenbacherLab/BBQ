@@ -3,7 +3,7 @@
 import argparse
 from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers
 from betterbasequals.call_mutations import run_mutation_caller
-from betterbasequals.utils import matches, mtypes
+from betterbasequals.utils import matches, mtypes, eprint
 from betterbasequals import __version__
 #import pysam
 from kmerpapa.algorithms import greedy_penalty_plus_pseudo
@@ -70,7 +70,6 @@ def main(args = None):
     """
     parser = get_parser()
     opts = parser.parse_args(args=args)
-    print(opts) 
 
     if opts.region is None:
         chrom = None
@@ -83,7 +82,7 @@ def main(args = None):
         end = int(end)
 
     #outfile = pysam.AlignmentFile(opts.outbam, "w", template=opts.bam_file)
-
+    eprint("Count good and bad kmers")
     good_kmers, bad_kmers = get_good_and_bad_kmers(
         opts.bam_file,
         opts.filter_bam_file,
@@ -111,6 +110,7 @@ def main(args = None):
     #pseudo_counts = [1,2,5,10,20,30,50,100,500,1000]
     #penalty_values = range(1,15)
     for mtype in mtypes:
+        eprint(f'Handling {mtype}')
         super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
         n_good = sum(good_kmers[mtype].values())
         n_bad = sum(bad_kmers[mtype].values())

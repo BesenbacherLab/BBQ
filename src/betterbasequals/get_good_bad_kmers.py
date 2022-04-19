@@ -3,7 +3,7 @@ import py2bit
 import os
 from collections import Counter
 
-from betterbasequals.utils import reverse_complement, mtypes, zip_pileups
+from betterbasequals.utils import reverse_complement, mtypes, zip_pileups, eprint
 from betterbasequals.pilup_handlers import get_pileup_count, get_pileup_count_double
     
 
@@ -62,7 +62,9 @@ class MutationFinder:
             #print(pileupcolumn.reference_pos, filter_pc.reference_pos)
             #print("test", pileupcolumn, filter_pc)
             ref_pos = pileupcolumn.reference_pos
-            chrom = pileupcolumn.reference_name            
+            chrom = pileupcolumn.reference_name
+            if ref_pos%1000 ==0:
+                eprint(f"{chrom}:{ref_pos}")            
             #if not self.bed_query_func(chrom, ref_pos):
             #    continue
             ref = self.tb.sequence(prefix + chrom, ref_pos, ref_pos + 1)
@@ -83,11 +85,20 @@ class MutationFinder:
                 continue
 
             n_ref_double, n_alt_double, has_incomp = get_pileup_count_double(pileupcolumn, ref, min_base_qual)
-            N_double = n_ref_double + sum(n_alt_double.values())
+            #N_double = n_ref_double + sum(n_alt_double.values())
             
             #if N_double >0:
             #    print(chrom, ref_pos)
+
+            kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
+            if 'N' in kmer:
+                continue
             
+            should_reverse = False
+            if kmer[radius] in ['T', 'G']:
+                kmer = reverse_complement(kmer)
+                should_reverse = True
+
             for A in [x for x in ['A','C','G','T'] if x != ref]:
                 n_A = n_alt[A]
                 if n_A == 0:
@@ -105,12 +116,7 @@ class MutationFinder:
                 else:
                     continue
                 
-                kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
-                if 'N' in kmer:
-                    continue
-                
-                if kmer[radius] in ['T', 'G']:
-                    kmer = reverse_complement(kmer)
+                if should_reverse:
                     A = reverse_complement(A)
 
                 mtype = kmer[radius] + '->' + A
