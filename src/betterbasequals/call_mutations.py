@@ -20,6 +20,10 @@ import os
 # p/(p-1) = A/B
 # Evt. sæt A->A i correction factor så det svarer til sandsynlighederne for ikke at se fejl.
 # Ellers skal jeg kun se på alt alleler i nedenstående funktion.
+# #######  Correction ########
+# Måske skal jeg antage at:
+# P(XXXAXXX->XXXBXXX|fejl) / P(XXXAXXX->XXXBXXX)  = kmer_papa[mtype][kmer] så
+# correction_factor[mtype][kmer] = -10*log10(kmer_papa[mtype][kmer])
 
 def get_alleles_w_corrected_quals(pileupcolumn, out_ref, kmer, should_reverse, correction_factor):
 
