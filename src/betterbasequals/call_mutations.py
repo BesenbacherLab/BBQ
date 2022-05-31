@@ -194,5 +194,5 @@ class MutationCaller:
 
 
 def run_mutation_caller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile, chrom, start, end, radius):
-    caller = MutationCaller(bam_file, filter_bam_file, twobit_file, kmer_papa, outfile)
+    caller = MutationCaller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile)
     caller.call_mutations(chrom, start, end, radius=radius)

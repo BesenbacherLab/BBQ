@@ -43,6 +43,7 @@ def get_alleles_w_BQ_and_BAQ(pileupcolumn, BAQ_pileupcolumn):
         # Look for read partner
         if read.query_name in reads_mem:
             # found partner process read pair
+            BQ = read.base_qual
             BAQ = BAQ_mem.pop(read.query_name)    
             base_quals[read.allel].append((BQ, BAQ))
 
@@ -75,14 +76,6 @@ def get_alleles_w_quals(pileupcolumn):
 
     return base_quals
 
-def open_bam_w_index(bam_file):
-    # Check if index exists, if not create an index file
-    bai_filename1 = f"{bam_file}.bai"
-    bai_filename2 = bam_file[:-1] + 'i'
-    if not os.path.exists(bai_filename1) and not os.path.exists(bai_filename2):
-        print(f"No index file found ({bai_filename1}), generating...")
-        pysam.index(bam_file)
-    return pysam.AlignmentFile(bam_file, "rb")
 
 class MutationCaller:
     def __init__(

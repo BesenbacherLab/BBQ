@@ -3,6 +3,8 @@ import sys
 from itertools import product, count
 from operator import add
 from functools import reduce, partial
+import pysam
+import os
 
 mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T')
 
@@ -134,3 +136,21 @@ def zip_pileups(*pileups):
                 yield pileupcolumns
         except StopIteration:
             break
+
+
+def open_bam_w_index(bam_file):
+    """Check if bam index exists, if not create an index file.
+    Then open and return pysam.AlignmentFile.
+
+    Args:
+        bam_file (str): file name
+
+    Returns:
+        _type_: _description_
+    """
+    bai_filename1 = f"{bam_file}.bai"
+    bai_filename2 = bam_file[:-1] + 'i'
+    if not os.path.exists(bai_filename1) and not os.path.exists(bai_filename2):
+        print(f"No index file found ({bai_filename1}), generating...")
+        pysam.index(bam_file)
+    return pysam.AlignmentFile(bam_file, "rb")

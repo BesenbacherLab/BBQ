@@ -5,23 +5,9 @@ from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers
 from betterbasequals.call_mutations import run_mutation_caller
 from betterbasequals.utils import matches, mtypes, eprint
 from betterbasequals import __version__
-#import pysam
 from kmerpapa.algorithms import greedy_penalty_plus_pseudo
 from kmerpapa.pattern_utils import get_M_U
 
-
-# import numpy as np
-
-
-# def greedy_papa_wrapper():
-#     def f(x):
-#         this_alpha, this_penalty, test_score = greedy_penalty_plus_pseudo.greedy_partition_CV(super_pattern, contextD, pseudo_counts, pargs, n_good, n_bad, penalty_values)
-#         return test_score[0]
-
-# def greedy_papa_NealderMead():
-#     x0 = np.array([1.0, 0.7, 0.8, 1.9, 1.2])
-#     res = minimize(rosen, x0, method='nelder-mead',
-#                options={'xatol': 1e-8, 'disp': True})
 
 def get_parser():
     """
