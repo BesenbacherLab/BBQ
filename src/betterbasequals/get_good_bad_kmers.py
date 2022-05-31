@@ -75,7 +75,7 @@ class MutationFinder:
             n_ref, n_alt = get_pileup_count(pileupcolumn, ref, min_base_qual)
             N = n_ref + sum(n_alt.values())
             #TODO: replace hardcoded numbers with values relative to mean coverage
-            if N < 100 or N > 220 or N == n_ref:
+            if N < 100 or N > 220 or N == n_ref or n_ref < 5:
                 continue
 
             n_ref_filter, n_alt_filter = get_pileup_count(filter_pc, ref, min_base_qual_filter, blood=True)
@@ -85,10 +85,11 @@ class MutationFinder:
                 continue
 
             n_ref_double, n_alt_double, has_incomp = get_pileup_count_double(pileupcolumn, ref, min_base_qual)
-            #N_double = n_ref_double + sum(n_alt_double.values())
+            N_double = n_ref_double + sum(n_alt_double.values())
             
-            #if N_double >0:
-            #    print(chrom, ref_pos)
+            if N_double == 0:
+                continue
+                #print(chrom, ref_pos)
 
             kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
             if 'N' in kmer:
