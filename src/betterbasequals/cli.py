@@ -2,7 +2,7 @@
 
 import argparse
 from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers
-from betterbasequals.call_mutations import run_mutation_caller
+from betterbasequals.call_mutations import MutationCaller
 from betterbasequals.utils import matches, mtypes, eprint
 from betterbasequals import __version__
 from kmerpapa.algorithms import greedy_penalty_plus_pseudo
@@ -25,9 +25,11 @@ def get_parser():
     parser.add_argument('-V', '--version', action='version', version=f'%(prog)s {__version__}')
     parser.add_argument("bam_file", help="bam file")
     parser.add_argument("filter_bam_file", help="bam file from blood")
+    parser.add_argument("validation_bam_file", help="hifi bam file")
     parser.add_argument("twobit_file", help="Reference genome in two-bit format")
     parser.add_argument("--output_file_good", type=argparse.FileType('w'))
     parser.add_argument("--output_file_bad", type=argparse.FileType('w'))
+    parser.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
     parser.add_argument("--radius", type=int, default=3)
     parser.add_argument('--region', '-r', type=str,
         help='only consider variants in this region')
@@ -115,18 +117,33 @@ def main(args = None):
             pat = names[i]
             M, U = counts[i]
             p = (M + best_alpha)/(M + U + best_alpha + best_beta)
+            if not opts.output_file_kmerpapa is None:
+                print(mtype, pat, p, -10*log10(p/(p-1)), file=opts.output_file_kmerpapa)
             for context in matches(pat):
                 kmer_papas[mtype][context] = p
+
+    #caller = MutationCaller(opts.bam_file, opts.filter_bam_file, opts.twobit_file, kmer_papas)
+
+    validator = \
+        MutationValidator(
+            opts.bam_file, 
+            opts.filter_bam_file, 
+            opts.validation_bam_file, 
+            opts.twobit_file, 
+            kmer_papas)
     
-    run_mutation_caller(
-        opts.bam_file, 
-        opts.filter_bam_file, 
-        opts.twobit_file, 
-        chrom, 
-        start, 
-        end, 
-        opts.radius,
-    )
+    validator.call
+
+
+    # run_mutation_caller(
+    #     opts.bam_file, 
+    #     opts.filter_bam_file, 
+    #     opts.twobit_file, 
+    #     chrom, 
+    #     start, 
+    #     end, 
+    #     opts.radius,
+    # )
 
     return 0
 

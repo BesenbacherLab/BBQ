@@ -98,7 +98,7 @@ class MutationCaller:
         self.tb.close()
 
     def call_mutations(self, chrom, start, stop, min_MQ=40, min_MQ_in_filter=20, min_BQ=90, min_BAQ=40, prefix=""):
-        BQ_pileup = self.bam_file.pileup(
+        BQ_pileup = self.BQ_bam.pileup(
             contig=chrom,
             start=start,
             stop=stop,
@@ -106,7 +106,7 @@ class MutationCaller:
             min_mapping_quality=min_MQ,
             flag_filter=3848,
         )
-        BAQ_pileup = self.bam_file.pileup(
+        BAQ_pileup = self.BAQ_bam.pileup(
             contig=chrom,
             start=start,
             stop=stop,
@@ -114,7 +114,7 @@ class MutationCaller:
             min_mapping_quality=min_MQ,
             flag_filter=3848,
         )
-        filter_pileup = self.filter_bam_file.pileup(
+        filter_pileup = self.filter_bam.pileup(
             contig=chrom,
             start=start,
             stop=stop,
@@ -151,5 +151,5 @@ class MutationCaller:
 
 
 def run_mutation_caller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile, chrom, start, end, radius):
-    caller = MutationCaller(bam_file, filter_bam_file, twobit_file, kmer_papa, outfile)
+    caller = MutationCaller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile)
     caller.call_mutations(chrom, start, end, radius=radius)
