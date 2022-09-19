@@ -62,7 +62,7 @@ class MutationFinderWFilter:
             #print("test", pileupcolumn, filter_pc)
             ref_pos = pileupcolumn.reference_pos
             chrom = pileupcolumn.reference_name
-            if ref_pos%1000 ==0:
+            if ref_pos%100000 ==0:
                 eprint(f"{chrom}:{ref_pos}")            
             #if not self.bed_query_func(chrom, ref_pos):
             #    continue
@@ -152,7 +152,7 @@ class MutationFinder:
     def __del__(self):
         self.tb.close()
 
-    def find_mutations(self, chrom, start, stop, mapq=50, mapq_filter=20, min_base_qual=30, min_base_qual_filter=20, radius=3, prefix=""):
+    def find_mutations(self, chrom, start, stop, mapq=50, min_base_qual=30, min_depth=1, max_depth=5000, radius=3, prefix=""):
         good_kmers = {x:Counter() for x in mtypes}
         bad_kmers = {x:Counter() for x in mtypes}
         pileup = self.bam_file.pileup(
@@ -170,7 +170,7 @@ class MutationFinder:
             #print("test", pileupcolumn, filter_pc)
             ref_pos = pileupcolumn.reference_pos
             chrom = pileupcolumn.reference_name
-            if ref_pos%1000 ==0:
+            if ref_pos%10000 ==0:
                 eprint(f"{chrom}:{ref_pos}")            
             #if not self.bed_query_func(chrom, ref_pos):
             #    continue
@@ -181,8 +181,9 @@ class MutationFinder:
             
             n_ref, n_alt = get_pileup_count(pileupcolumn, ref, min_base_qual)
             N = n_ref + sum(n_alt.values())
-            #TODO: replace hardcoded numbers with values relative to mean coverage
-            if N < 100 or N > 220 or N == n_ref:
+            #TODO: can I learn good filter values from data.
+            # fx just have values relative to mean. maybe with poison stderr.
+            if N < min_depth or N > max_depth or N == n_ref:
                 continue
 
             n_ref_double, n_alt_double, has_incomp = get_pileup_count_double(pileupcolumn, ref, min_base_qual)
@@ -222,8 +223,8 @@ class MutationFinder:
                     bad_kmers[mtype][kmer] += 1
         return good_kmers, bad_kmers
 
-def get_good_and_bad_kmers(bam_file,  twobit_file, chrom, start, end, radius):
+def get_good_and_bad_kmers(bam_file,  twobit_file, chrom, start, end, min_depth, max_depth, radius):
     finder = MutationFinder(bam_file, twobit_file)
-    good_kmers, bad_kmers = finder.find_mutations(chrom, start, end, radius=radius)
+    good_kmers, bad_kmers = finder.find_mutations(chrom, start, end, min_depth, max_depth, radius=radius)
     return good_kmers, bad_kmers
 

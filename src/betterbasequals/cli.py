@@ -2,11 +2,13 @@
 
 import argparse
 from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers
-from betterbasequals.call_mutations import MutationCaller
+#from betterbasequals.call_mutations import MutationCaller
+from betterbasequals.call_mutations import MutationValidator
 from betterbasequals.utils import matches, mtypes, eprint
 from betterbasequals import __version__
 from kmerpapa.algorithms import greedy_penalty_plus_pseudo
 from kmerpapa.pattern_utils import get_M_U
+from math import log10
 
 
 def get_parser():
@@ -31,6 +33,10 @@ def get_parser():
     parser.add_argument("--output_file_bad", type=argparse.FileType('w'))
     parser.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
     parser.add_argument("--radius", type=int, default=3)
+    parser.add_argument('--min_depth', type=int, default=1,
+        help="mminimum depth at a site to be considered as training data")
+    parser.add_argument('--max_depth', type=int, default=1,
+        help="maximum depth at a site to be considered as training data")
     parser.add_argument('--region', '-r', type=str,
         help='only consider variants in this region')
     parser.add_argument('--outbam', type=str,
@@ -73,11 +79,12 @@ def main(args = None):
     eprint("Count good and bad kmers")
     good_kmers, bad_kmers = get_good_and_bad_kmers(
         opts.bam_file,
-        opts.filter_bam_file,
         opts.twobit_file,
         chrom,
         start,
         end,
+        opts.min_depth,
+        opts.max_depth,
         opts.radius,
     )
 
@@ -94,6 +101,7 @@ def main(args = None):
                 print(mtype, kmer, bad_kmers[mtype][kmer], file = opts.output_file_bad)
         opts.output_file_bad.close()
 
+
     kmer_papas = {}
     #pseudo_counts = [1,2,5,10,20,30,50,100,500,1000]
     #penalty_values = range(1,15)
@@ -102,12 +110,13 @@ def main(args = None):
         super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
         n_good = sum(good_kmers[mtype].values())
         n_bad = sum(bad_kmers[mtype].values())
-        print(mtype, n_good, n_bad)
-        contextD = dict((x, (good_kmers[mtype][x], bad_kmers[mtype][x])) for x in matches(super_pattern))
+        print(mtype, n_bad, n_good)
+        contextD = dict((x, (bad_kmers[mtype][x], good_kmers[mtype][x])) for x in matches(super_pattern))
         CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
         best_alpha, best_penalty, test_score = CV.get_best_a_c()
-        my=n_good/(n_good+n_bad)
+        my=n_bad/(n_good+n_bad)
         best_beta = (best_alpha*(1.0-my))/my
+        print(best_penalty, best_alpha, best_beta, my)
         best_score, M, U, names = greedy_penalty_plus_pseudo.greedy_partition(super_pattern, contextD, best_alpha, best_beta, best_penalty, {})
         counts = []
         for pat in names:
@@ -118,10 +127,10 @@ def main(args = None):
             M, U = counts[i]
             p = (M + best_alpha)/(M + U + best_alpha + best_beta)
             if not opts.output_file_kmerpapa is None:
-                print(mtype, pat, p, -10*log10(p/(p-1)), file=opts.output_file_kmerpapa)
+                print(mtype, pat, p, -10*log10(p/(1-p)))
+                print(mtype, pat, p, -10*log10(p/(1-p)), file=opts.output_file_kmerpapa)
             for context in matches(pat):
-                kmer_papas[mtype][context] = p
-
+                kmer_papas[mtype][context] = -10*log10(p/(1-p))
     #caller = MutationCaller(opts.bam_file, opts.filter_bam_file, opts.twobit_file, kmer_papas)
 
     validator = \
@@ -132,7 +141,7 @@ def main(args = None):
             opts.twobit_file, 
             kmer_papas)
     
-    validator.call
+    validator.call_mutations(chrom, start, end)
 
 
     # run_mutation_caller(

@@ -16,8 +16,8 @@ import os
 #    P(XXXAXXX->XXXBXXX|fejl)/(P(XXXAXXX->XXXBXXX|fejl) + P(XXXAXXX->XXXBXXX))
 #  så kmer_papa[mtype][kmer] / (1-kmer_papa[mtype][kmer]) er  lig med  P(XXXAXXX->XXXBXXX|fejl) / P(XXXAXXX->XXXBXXX)
 # p = A / (A+B)
-# p-1 = B /(A+B)
-# p/(p-1) = A/B
+# 1-p = B /(A+B)
+# p/(1-p) = A/B
 # Evt. sæt A->A i correction factor så det svarer til sandsynlighederne for ikke at se fejl.
 # Ellers skal jeg kun se på alt alleler i nedenstående funktion.
 # #######  Correction ########
@@ -26,10 +26,11 @@ import os
 # correction_factor[mtype][kmer] = -10*log10(kmer_papa[mtype][kmer])
 
 def get_mut_type(ref, papa_ref, alt):
-    if ref == papa_ref:
+    if ref != papa_ref:
         mtype = papa_ref + '->' + reverse_complement(alt)
     else:
         mtype = papa_ref + '->' + alt
+    return mtype
 
 
 def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_factor):
@@ -106,7 +107,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
             base_quals[read.allel].append((adjusted_base_qual, read.base_qual, 3))
         else:
             n_ref += 1
-    return base_quals
+    return base_quals, n_ref
 
 
 def get_alleles_w_quals(pileupcolumn):
@@ -146,12 +147,20 @@ class MutationCaller:
 
         self.tb = py2bit.open(twobit_file)
 
+
+        #assumes that the kmer papa has been turned into phred scaled correction factor
+        self.correction_factor = kmer_papa
+
         # Create correction factor dict:
-        self.correction_factor = {}
-        for mtype in kmer_papa:
-            for kmer in kmer_papa[mtype]:
-                p = kmer_papa[mtype][kmer]
-                self.correction_factor[mtype][kmer] = -10*log10(p/(p-1))
+
+        # self.correction_factor = {mtype:{} for mtype in kmer_papa}
+        # print(self.correction)
+        # for mtype in kmer_papa:
+        #     for kmer in kmer_papa[mtype]:
+        #         p = kmer_papa[mtype][kmer]
+        #         self.correction_factor[mtype][kmer] = -10*log10(p/(p-1))
+        #         #self.correction_factor[mtype][kmer] = -10*log10(p)
+                
 
     def __del__(self):
         self.tb.close()
@@ -240,16 +249,19 @@ class MutationValidator:
 
         self.tb = py2bit.open(twobit_file)
 
-        self.radius = None
+        self.radius = len(next(iter(kmer_papa["A->C"].keys())))//2
+
+        #assumes that the kmer papa has been turned into phred scaled correction factor
+        self.correction_factor = kmer_papa
 
         # Create correction factor dict:
-        self.correction_factor = {}
-        for mtype in kmer_papa:
-            for kmer in kmer_papa[mtype]:
-                if self.radius is None:
-                    self.radius == len(kmer)//2
-                p = kmer_papa[mtype][kmer]
-                self.correction_factor[mtype][kmer] = -10*log10(p/(p-1))
+        # self.correction_factor = {}
+        # for mtype in kmer_papa:
+        #     for kmer in kmer_papa[mtype]:
+        #         if self.radius is None:
+        #             self.radius == len(kmer)//2
+        #         p = kmer_papa[mtype][kmer]
+        #         self.correction_factor[mtype][kmer] = -10*log10(p/(1-p))
 
     def __del__(self):
         self.tb.close()
@@ -317,16 +329,18 @@ class MutationValidator:
             n_alt = sum(len(corrected_base_quals[x]) for x in corrected_base_quals)
 
             hifi_basequals = get_alleles_w_quals(hifi_pc)
-
+            n_hifi_reads = sum(len(hifi_basequals[x]) for x in hifi_basequals)
+            
             for A in [x for x in ['A','C','G','T'] if x != ref]:
                 if len(corrected_base_quals[A]) == 0:
                     continue
-                if n_alt_filter[A] > 0:
-                    continue
+                #if n_alt_filter[A] > 0:
+                #    continue
                 # Variant quality
-                var_qual = sum(corrected_base_quals[A])
+                corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
+                uncorr_var_qual = sum(x[1] for x in corrected_base_quals[A])
                 for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
-                    print(corrected_Q, uncorrected_Q, base_type, n_alt + n_ref, sum(hifi_basequals[A]))
+                    print(chrom, ref_pos, ref, A, corrected_Q, uncorrected_Q, base_type, n_alt + n_ref, corr_var_qual, uncorr_var_qual, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
                 #yield (chrom, ref_pos, ref, A, corrected_base_quals[A], n_alt + n_ref, sum(hifi_basequals[A]))
 
 
