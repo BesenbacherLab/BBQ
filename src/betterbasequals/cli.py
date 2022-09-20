@@ -177,7 +177,7 @@ def main(args = None):
         opts.end = None
     elif ":" in opts.region:
         opts.chrom, end_points = opts.region.split(':')
-        opts.start, end = end_points.split('-')
+        opts.start, opts.end = end_points.split('-')
         opts.start = int(opts.start)
         opts.end = int(opts.end)
     else:
