@@ -81,18 +81,18 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
                 adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
                 unadjusted_base_qual = read.base_qual # vælger tilfældig. Kunne også tage max, min  eller sum?
-                base_quals[read.allel].append((adjusted_base_qual1 + adjusted_base_qual2, unadjusted_base_qual, 1))
+                base_quals[read.allel].append((adjusted_base_qual1 + adjusted_base_qual2, max(adjusted_base_qual1, adjusted_base_qual2), unadjusted_base_qual, 1))
             else:
                 #Are ignoring ref alleles pt... should adjust later
                 if read.allel != ref:
                     #mut_type = get_mut_type(ref, papa_ref, read.allel)
-                    base_quals[read.allel].append((0, read.base_qual, 2))
+                    base_quals[read.allel].append((0, 0, read.base_qual, 2))
                 else:
                     n_ref += 1
                 #Are ignoring ref alleles pt... should adjust later
                 if mem_read.allel != ref:
                     #mut_type = get_mut_type(ref, papa_ref, mem_read.allel)
-                    base_quals[read.allel].append((0, mem_read.base_qual, 2))
+                    base_quals[read.allel].append((0, 0, mem_read.base_qual, 2))
                 else:
                     n_ref += 1
 
@@ -104,7 +104,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
         if read.allel != ref:
             mut_type = get_mut_type(ref, papa_ref, read.allel)
             adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
-            base_quals[read.allel].append((adjusted_base_qual, read.base_qual, 3))
+            base_quals[read.allel].append((adjusted_base_qual, adjusted_base_qual, read.base_qual, 3))
         else:
             n_ref += 1
     return base_quals, n_ref
@@ -338,9 +338,10 @@ class MutationValidator:
                 #    continue
                 # Variant quality
                 corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
-                uncorr_var_qual = sum(x[1] for x in corrected_base_quals[A])
-                for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
-                    print(chrom, ref_pos, ref, A, corrected_Q, uncorrected_Q, base_type, n_alt + n_ref, corr_var_qual, uncorr_var_qual, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
+                corr_var_qual2 = sum(x[1] for x in corrected_base_quals[A])
+                uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
+                for corrected_Q, corrected_Q2, uncorrected_Q, base_type in corrected_base_quals[A]:
+                    print(chrom, ref_pos, ref, A, corrected_Q, uncorrected_Q, corrected_Q2, base_type, n_alt + n_ref, corr_var_qual, corr_var_qual2, uncorr_var_qual, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
                 #yield (chrom, ref_pos, ref, A, corrected_base_quals[A], n_alt + n_ref, sum(hifi_basequals[A]))
 
 

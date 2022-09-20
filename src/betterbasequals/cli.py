@@ -53,6 +53,7 @@ def get_parser():
         help='Repeat cross validation i times when fitting hyperparameters in kmerpapa')
     parser.add_argument('--seed', type=int,
         help='seed for numpy.random')
+    parser.add_argument("--verbosity", type=int, default=1)
     return parser
 
 def run_get_good_and_bad(opts):
@@ -117,13 +118,13 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
         super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
         n_good = sum(good_kmers[mtype].values())
         n_bad = sum(bad_kmers[mtype].values())
-        print(mtype, n_bad, n_good)
+        eprint(mtype, n_bad, n_good)
         contextD = dict((x, (bad_kmers[mtype][x], good_kmers[mtype][x])) for x in matches(super_pattern))
         CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
         best_alpha, best_penalty, test_score = CV.get_best_a_c()
         my=n_bad/(n_good+n_bad)
         best_beta = (best_alpha*(1.0-my))/my
-        print(best_penalty, best_alpha, best_beta, my)
+        eprint(best_penalty, best_alpha, best_beta, my)
         best_score, M, U, names = greedy_penalty_plus_pseudo.greedy_partition(super_pattern, contextD, best_alpha, best_beta, best_penalty, {})
         counts = []
         for pat in names:
