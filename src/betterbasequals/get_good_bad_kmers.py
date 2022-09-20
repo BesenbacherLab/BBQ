@@ -57,6 +57,7 @@ class MutationFinderWFilter:
             flag_require=2,  # proper paired
             flag_filter=3848,
         )
+        print("test")
         for pileupcolumn, filter_pc in zip_pileups(pileup, filter_pileup):
             #print(pileupcolumn.reference_pos, filter_pc.reference_pos)
             #print("test", pileupcolumn, filter_pc)
@@ -165,6 +166,7 @@ class MutationFinder:
             flag_require=2,  # proper paired
             flag_filter=3848,
         )
+        print("test")
         for pileupcolumn in pileup:
             #print(pileupcolumn.reference_pos, filter_pc.reference_pos)
             #print("test", pileupcolumn, filter_pc)

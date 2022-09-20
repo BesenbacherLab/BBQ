@@ -113,7 +113,7 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
     kmer_papas = {}
     #pseudo_counts = [1,2,5,10,20,30,50,100,500,1000]
     #penalty_values = range(1,15)
-    for mtype in kmer_papas:
+    for mtype in good_kmers:
         eprint(f'Handling {mtype}')
         super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
         n_good = sum(good_kmers[mtype].values())
@@ -192,6 +192,8 @@ def main(args = None):
             eprint("Counting good and bad kmers")
         good_kmers, bad_kmers = run_get_good_and_bad(opts)
     elif opts.train_kmerpapas_only:
+        if opts.verbosity > 0:
+            eprint("Reading good and bad kmers")
         good_kmers, bad_kmers = read_kmers(opts)
 
     if opts.get_training_kmers_only:
@@ -201,11 +203,15 @@ def main(args = None):
         eprint("Training kmer pattern partitions")
         kmer_papas = run_get_kmerpapas(opts, good_kmers, bad_kmers)
     else:
+        eprint("Reading kmer pattern partitions")
         kmer_papas = read_kmer_papas(opts)
 
-    if opts.validation_only:
-        return 0
+    for x in kmer_papas:
+        eprint(x)
 
+    #if opts.train_kmerpapas_only:
+    #    return 0
+    eprint("Running validation")
     run_validation(opts, kmer_papas)
     
     #caller = MutationCaller(opts.bam_file, opts.filter_bam_file, opts.twobit_file, kmer_papas)
