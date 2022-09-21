@@ -1,15 +1,14 @@
 """Module that contains the command line application."""
 
 import argparse
-from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers
+from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers, get_good_and_bad_kmers_w_filter
 #from betterbasequals.call_mutations import MutationCaller
 from betterbasequals.call_mutations import MutationValidator
-from betterbasequals.utils import matches, mtypes, eprint
+from betterbasequals.utils import *
 from betterbasequals import __version__
 from kmerpapa.algorithms import greedy_penalty_plus_pseudo
 from kmerpapa.pattern_utils import get_M_U
 from math import log10
-
 
 def get_parser():
     """
@@ -56,6 +55,7 @@ def get_parser():
     parser.add_argument("--verbosity", type=int, default=1)
     return parser
 
+
 def run_get_good_and_bad(opts):
     good_kmers, bad_kmers = get_good_and_bad_kmers(
         opts.bam_file,
@@ -67,47 +67,24 @@ def run_get_good_and_bad(opts):
         opts.max_depth,
         opts.radius,
     )
-    if not opts.output_file_good is None:
-        for mtype in mtypes:
-            super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
-            for kmer in  matches(super_pattern):
-                print(mtype, kmer, good_kmers[mtype][kmer] , file = opts.output_file_good)
-        opts.output_file_good.close()
-    if not opts.output_file_bad is None:
-        for mtype in mtypes:
-            super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
-            for kmer in matches(super_pattern):
-                print(mtype, kmer, bad_kmers[mtype][kmer], file = opts.output_file_bad)
-        opts.output_file_bad.close()
+    print_good_and_bad(opts, good_kmers, bad_kmers)
     return good_kmers, bad_kmers
 
-def read_kmers(opts):
-    good_kmers = {}
-    for line in opts.input_file_good:
-        mtype, kmer, count = line.split()
-        if mtype not in good_kmers:
-            good_kmers[mtype] = {}
-        good_kmers[mtype][kmer] = int(count)
-
-    bad_kmers = {}
-    for line in opts.input_file_bad:
-        mtype, kmer, count = line.split()
-        if mtype not in bad_kmers:
-            bad_kmers[mtype] = {}
-        bad_kmers[mtype][kmer] = int(count)
+def run_get_good_and_bad_w_filter(opts):
+    good_kmers, bad_kmers = get_good_and_bad_kmers_w_filter(
+        opts.bam_file,
+        opts.filter_bam_file,
+        opts.twobit_file,
+        opts.chrom,
+        opts.start,
+        opts.end,
+        opts.min_depth,
+        opts.max_depth,
+        opts.radius,
+    )
+    print_good_and_bad(opts, good_kmers, bad_kmers)
     return good_kmers, bad_kmers
 
-def read_kmer_papas(opts):
-    kmer_papas = {}
-    for line in opts.input_file_kmerpapa:
-        mtype, kmer, correction_factor = line.split()
-        if mtype not in kmer_papas:
-            kmer_papas[mtype] = {}
-        kmer_papas[mtype][kmer] = float(correction_factor)
-    return kmer_papas
-
-def run_all(opts):
-    good_kmers, bad_kmers = run_get_good_and_bad(opts)
 
 def run_get_kmerpapas(opts, good_kmers, bad_kmers):
     kmer_papas = {}
@@ -171,26 +148,17 @@ def main(args = None):
     parser = get_parser()
     opts = parser.parse_args(args=args)
 
-    if opts.region is None:
-        opts.chrom = None
-        opts.start = None
-        opts.end = None
-    elif ":" in opts.region:
-        opts.chrom, end_points = opts.region.split(':')
-        opts.start, opts.end = end_points.split('-')
-        opts.start = int(opts.start)
-        opts.end = int(opts.end)
-    else:
-        opts.chrom = opts.region
-        opts.start = None
-        opts.end = None
+    parse_opts_region(opts)
 
     #outfile = pysam.AlignmentFile(opts.outbam, "w", template=opts.bam_file)
 
     if not opts.train_kmerpapas_only and not opts.validation_only:
         if opts.verbosity > 0:
             eprint("Counting good and bad kmers")
-        good_kmers, bad_kmers = run_get_good_and_bad(opts)
+        if opts.filter_bam_file is None:            
+            good_kmers, bad_kmers = run_get_good_and_bad(opts)
+        else:
+            good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.train_kmerpapas_only:
         if opts.verbosity > 0:
             eprint("Reading good and bad kmers")
@@ -209,14 +177,13 @@ def main(args = None):
     for x in kmer_papas:
         eprint(x)
 
-    #if opts.train_kmerpapas_only:
-    #    return 0
+    if opts.train_kmerpapas_only:
+        return 0
+
     eprint("Running validation")
     run_validation(opts, kmer_papas)
     
     #caller = MutationCaller(opts.bam_file, opts.filter_bam_file, opts.twobit_file, kmer_papas)
-
-
 
     # run_mutation_caller(
     #     opts.bam_file, 
