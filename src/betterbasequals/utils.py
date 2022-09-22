@@ -154,3 +154,57 @@ def open_bam_w_index(bam_file):
         print(f"No index file found ({bai_filename1}), generating...")
         pysam.index(bam_file)
     return pysam.AlignmentFile(bam_file, "rb")
+
+def read_kmers(opts):
+    good_kmers = {}
+    for line in opts.input_file_good:
+        mtype, kmer, count = line.split()
+        if mtype not in good_kmers:
+            good_kmers[mtype] = {}
+        good_kmers[mtype][kmer] = int(count)
+
+    bad_kmers = {}
+    for line in opts.input_file_bad:
+        mtype, kmer, count = line.split()
+        if mtype not in bad_kmers:
+            bad_kmers[mtype] = {}
+        bad_kmers[mtype][kmer] = int(count)
+    return good_kmers, bad_kmers
+
+def read_kmer_papas(opts):
+    kmer_papas = {}
+    for line in opts.input_file_kmerpapa:
+        mtype, kmer, correction_factor = line.split()
+        if mtype not in kmer_papas:
+            kmer_papas[mtype] = {}
+        kmer_papas[mtype][kmer] = float(correction_factor)
+    return kmer_papas
+
+def print_good_and_bad(opts, good_kmers, bad_kmers):
+    if not opts.output_file_good is None:
+        for mtype in mtypes:
+            super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
+            for kmer in  matches(super_pattern):
+                print(mtype, kmer, good_kmers[mtype][kmer] , file = opts.output_file_good)
+        opts.output_file_good.close()
+    if not opts.output_file_bad is None:
+        for mtype in mtypes:
+            super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
+            for kmer in matches(super_pattern):
+                print(mtype, kmer, bad_kmers[mtype][kmer], file = opts.output_file_bad)
+        opts.output_file_bad.close()
+
+def parse_opts_region(opts):
+    if opts.region is None:
+        opts.chrom = None
+        opts.start = None
+        opts.end = None
+    elif ":" in opts.region:
+        opts.chrom, end_points = opts.region.split(':')
+        opts.start, opts.end = end_points.split('-')
+        opts.start = int(opts.start)
+        opts.end = int(opts.end)
+    else:
+        opts.chrom = opts.region
+        opts.start = None
+        opts.end = None
