@@ -61,23 +61,21 @@ class MutationFinderWFilter:
             N = n_ref + sum(n_alt.values())
             #TODO: can I learn good filter values from data.
             # fx just have values relative to mean. maybe with poison stderr.
+            #print(f'N={N}, {min_depth}, {max_depth}, {n_ref}')
             if N < min_depth or N > max_depth or N == n_ref:
                 continue
 
             n_ref_filter, n_alt_filter = get_pileup_count(filter_pc, ref, min_base_qual_filter, blood=True)
             N_filter = n_ref_filter + sum(n_alt_filter.values())
             #TODO: replace hardcoded numbers with values relative to mean coverage
-            #print(N_filter)
             if N_filter < 25 or N_filter > 55:
                 continue
 
             n_ref_double, n_alt_double, has_incomp = get_pileup_count_double(pileupcolumn, ref, min_base_qual)
             N_double = n_ref_double + sum(n_alt_double.values())
             
-            #print(N_double)
-            #if N_double == 0:
+            #f N_double == 0:
             #    continue
-                #print(chrom, ref_pos)
 
             kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
             if 'N' in kmer:
@@ -97,7 +95,6 @@ class MutationFinderWFilter:
                 #    continue
                 n_A_double = n_alt_double[A]
                 incompatibility = has_incomp[A]
-
                 if n_A_double > 0 and not incompatibility:
                     mut_type = "good"
                 elif n_A_double == 0 and incompatibility:
@@ -205,7 +202,7 @@ class MutationFinder:
                     bad_kmers[mtype][kmer] += 1
         return good_kmers, bad_kmers
 
-def get_good_and_bad_kmers(bam_file,  twobit_file, chrom, start, end, min_depth, max_depth, radius):
+def get_good_and_bad_kmers(bam_file, twobit_file, chrom, start, end, min_depth, max_depth, radius):
     finder = MutationFinder(bam_file, twobit_file)
     good_kmers, bad_kmers = finder.find_mutations(chrom, start, end, min_depth=min_depth, max_depth=max_depth, radius=radius)
     return good_kmers, bad_kmers
