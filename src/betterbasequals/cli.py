@@ -40,7 +40,7 @@ def get_parser():
     parser.add_argument("--radius", type=int, default=3)
     parser.add_argument('--min_depth', type=int, default=1,
         help="mminimum depth at a site to be considered as training data")
-    parser.add_argument('--max_depth', type=int, default=1,
+    parser.add_argument('--max_depth', type=int, default=5000,
         help="maximum depth at a site to be considered as training data")
     parser.add_argument('--region', '-r', type=str,
         help='only consider variants in this region')
