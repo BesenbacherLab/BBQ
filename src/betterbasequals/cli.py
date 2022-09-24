@@ -44,6 +44,8 @@ def get_parser():
         help="maximum depth at a site to be considered as training data")
     parser.add_argument('--region', '-r', type=str,
         help='only consider variants in this region')
+    parser.add_argument('--kmerpapa_method', type=str, default = "greedy",
+        help='only consider variants in this region')
     parser.add_argument('--outbam', type=str,
         help="Bam file with adjusted base qualities.")
     parser.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
@@ -114,7 +116,7 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
             if opts.verbosity > 0:
                 eprint(mtype, pat, p, -10*log10(p/(1-p)))
             if not opts.output_file_kmerpapa is None:
-                print(mtype, pat, p, -10*log10(p/(1-p)), file=opts.output_file_kmerpapa)
+                print(mtype, pat, -10*log10(p/(1-p)), file=opts.output_file_kmerpapa)
             for context in matches(pat):
                 kmer_papas[mtype][context] = -10*log10(p/(1-p))
     if not opts.output_file_kmerpapa is None:

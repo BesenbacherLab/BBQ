@@ -174,10 +174,11 @@ def read_kmers(opts):
 def read_kmer_papas(opts):
     kmer_papas = {}
     for line in opts.input_file_kmerpapa:
-        mtype, kmer, correction_factor = line.split()
+        mtype, pattern, correction_factor = line.split()
         if mtype not in kmer_papas:
             kmer_papas[mtype] = {}
-        kmer_papas[mtype][kmer] = float(correction_factor)
+        for context in matches(pattern):
+            kmer_papas[mtype][context] = float(correction_factor)
     return kmer_papas
 
 def print_good_and_bad(opts, good_kmers, bad_kmers):
