@@ -10,6 +10,7 @@ from kmerpapa.algorithms import greedy_penalty_plus_pseudo
 from kmerpapa.pattern_utils import get_M_U
 from math import log10
 
+
 def get_parser():
     """
     Return the CLI argument parser.
@@ -23,38 +24,105 @@ def get_parser():
         Calculates sample-specific base qualities using overlapping reads.
         ''')
 
-    parser.add_argument('-V', '--version', action='version', version=f'%(prog)s {__version__}')
-    parser.add_argument("--bam_file", help="bam file")
-    parser.add_argument("--twobit_file", help="Reference genome in two-bit format")
-    parser.add_argument("--filter_bam_file", help="bam file from blood")
-    parser.add_argument("--validation_bam_file", help="hifi bam file")
-    parser.add_argument("--output_file_good", type=argparse.FileType('w'))
-    parser.add_argument("--output_file_bad", type=argparse.FileType('w'))
-    parser.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
-    parser.add_argument("--input_file_good", type=argparse.FileType('r'))
-    parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
-    parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
-    parser.add_argument("--get_training_kmers_only", action="store_true")
-    parser.add_argument("--train_kmerpapas_only", action="store_true")
-    parser.add_argument("--validation_only", action="store_true")
-    parser.add_argument("--radius", type=int, default=3)
-    parser.add_argument('--min_depth', type=int, default=1,
-        help="mminimum depth at a site to be considered as training data")
-    parser.add_argument('--max_depth', type=int, default=5000,
-        help="maximum depth at a site to be considered as training data")
-    parser.add_argument('--region', '-r', type=str,
-        help='only consider variants in this region')
-    parser.add_argument('--kmerpapa_method', type=str, default = "greedy",
-        help='only consider variants in this region')
-    parser.add_argument('--outbam', type=str,
-        help="Bam file with adjusted base qualities.")
-    parser.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
-        help='Number of folds to use when fitting hyperparameters in kmerpapa')
-    parser.add_argument('-i', '--iterations', type=int, default=1, metavar='i',
-        help='Repeat cross validation i times when fitting hyperparameters in kmerpapa')
-    parser.add_argument('--seed', type=int,
-        help='seed for numpy.random')
+    # top level args:
     parser.add_argument("--verbosity", type=int, default=1)
+    parser.add_argument('-V', '--version', action='version', version=f'%(prog)s {__version__}')
+
+    subparsers = parser.add_subparsers(dest='command', help='commands')
+
+    # args bam file:
+    bam_parent = argparse.ArgumentParser(add_help=False)
+    bam_parent.add_argument("--bam_file", required=True,
+        help="bam file")
+    bam_parent.add_argument("--twobit_file", required=True,
+        help="Reference genome in two-bit format")
+    bam_parent.add_argument('--region', '-r', type=str,
+        help='only consider variants in this region')
+
+    # args for filter bam file
+    filter_parent = argparse.ArgumentParser(add_help=False)
+    filter_parent.add_argument("--filter_bam_file", help="bam file from blood")
+
+
+    # args for counting kmers:
+    count_parent = argparse.ArgumentParser(add_help=False)
+    count_parent.add_argument("--output_file_good", type=argparse.FileType('w'))
+    count_parent.add_argument("--output_file_bad", type=argparse.FileType('w'))
+    count_parent.add_argument("--radius", type=int, default=3)
+    count_parent.add_argument('--min_depth', type=int, default=1,
+        help="mminimum depth at a site to be considered as training data")
+    count_parent.add_argument('--max_depth', type=int, default=5000,
+        help="maximum depth at a site to be considered as training data")
+    count_parent.add_argument('--filter_min_depth', type=int, default=1,
+        help="minimum depth in filter_bam_file for a site to be considered as training data")
+    count_parent.add_argument('--filter_max_depth', type=int, default=5000,
+        help="maximum depth om filter_bam_file at a site to be considered as training data")
+
+
+    # args for training models:    
+    train_parent = argparse.ArgumentParser(add_help=False)
+    train_parent.add_argument('--kmerpapa_method', type=str, default = "greedy",
+        help='only consider variants in this region')
+    train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
+        help='Number of folds to use when fitting hyperparameters in kmerpapa')
+    train_parent.add_argument('-i', '--iterations', type=int, default=1, metavar='i',
+        help='Repeat cross validation i times when fitting hyperparameters in kmerpapa')
+    train_parent.add_argument('--seed', type=int,
+        help='seed for numpy.random')
+
+    # args for validating models:    
+    validate_parent = argparse.ArgumentParser(add_help=False)
+    validate_parent.add_argument("--validation_bam_file", help="hifi bam file")
+
+    # args for printing polished bam:    
+    adjust_parent = argparse.ArgumentParser(add_help=False)
+    adjust_parent.add_argument('--outbam', type=str,
+        help="Bam file with adjusted base qualities.")
+
+    # args for calling somatic variants:    
+    call_parent = argparse.ArgumentParser(add_help=False)
+    call_parent.add_argument('--outfile', type=str,
+        help="output file")
+
+    count_parser = subparsers.add_parser('count', 
+        description='Count good and bad k-mers', 
+        parents=[bam_parent, filter_parent, count_parent])
+
+    train_parser = subparsers.add_parser('train', 
+        description='First run "count" then train model to distinguish good and bad k-mers.', 
+        parents=[bam_parent, filter_parent, count_parent, train_parent])
+
+    train_only_parser = subparsers.add_parser('train_only', 
+        description='Train model to distinguish good and bad k-mers.', 
+        parents=[train_parent])
+    train_only_parser.add_argument("--input_file_good", type=argparse.FileType('r'))
+    train_only_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
+
+    validate_parser = subparsers.add_parser('validate', 
+        description='First run "count" and "train" then print validation data', 
+        parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent])
+
+    validate_only_parser = subparsers.add_parser('validate_only', 
+        description='print validation data.', 
+        parents=[bam_parent, filter_parent, validate_parent]) 
+    validate_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
+    
+    adjust_parser = subparsers.add_parser('adjust', 
+        description='First run "count" and "train" then output bam with adjusted base qualities.', 
+        parents=[bam_parent, filter_parent, count_parent, train_parent, adjust_parent])
+
+    adjust_parser = subparsers.add_parser('adjust_only', 
+        description='Output bam with adjusted base qualities.', 
+        parents=[adjust_parent])
+
+    call_parser = subparsers.add_parser('call', 
+        description='First run "count" and "train" then call variants', 
+        parents=[bam_parent, count_parent, train_parent, call_parent])
+
+    call_only_parser = subparsers.add_parser('call_only', 
+        description='Call variants', 
+        parents=[call_parent])
+
     return parser
 
 
@@ -150,11 +218,15 @@ def main(args = None):
     parser = get_parser()
     opts = parser.parse_args(args=args)
 
-    parse_opts_region(opts)
+    #parse_opts_region(opts)
 
     #outfile = pysam.AlignmentFile(opts.outbam, "w", template=opts.bam_file)
+    
+    print(opts.command)
 
-    if not opts.train_kmerpapas_only and not opts.validation_only:
+    print(opts)
+
+    if not opts.command in ['train_only', 'validation_only', 'call_only', 'adjust_only']:
         if opts.verbosity > 0:
             eprint("Counting good and bad kmers")
         if opts.filter_bam_file is None:            
@@ -166,25 +238,33 @@ def main(args = None):
             eprint("Reading good and bad kmers")
         good_kmers, bad_kmers = read_kmers(opts)
 
-    if opts.get_training_kmers_only:
+    if opts.command == 'count':
         return 0
 
-    if not opts.validation_only:
+    if not opts.command in ['validation_only', 'call_only', 'adjust_only']:
         eprint("Training kmer pattern partitions")
         kmer_papas = run_get_kmerpapas(opts, good_kmers, bad_kmers)
     else:
         eprint("Reading kmer pattern partitions")
         kmer_papas = read_kmer_papas(opts)
 
-    for x in kmer_papas:
-        eprint(x)
+    # for x in kmer_papas:
+    #     eprint(x)
 
-    if opts.train_kmerpapas_only:
+    if opts.command in ['train_only', 'train']:
         return 0
 
-    eprint("Running validation")
-    run_validation(opts, kmer_papas)
-    
+    if opts.command in ['validate', 'validate_only']:
+        eprint("Running validation")
+        run_validation(opts, kmer_papas)
+    elif opts.command in ['call', 'call_only']:
+        eprint("Call not implemented yet")
+    elif opts.command in ['adjust', 'adjust_only']:
+        eprint("Adjust not implemented yet")   
+    else:
+        eprint("Unknown command: {opts.command}")
+        return 1
+
     #caller = MutationCaller(opts.bam_file, opts.filter_bam_file, opts.twobit_file, kmer_papas)
 
     # run_mutation_caller(
