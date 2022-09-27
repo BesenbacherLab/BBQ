@@ -3,7 +3,7 @@
 import argparse
 from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers, get_good_and_bad_kmers_w_filter
 #from betterbasequals.call_mutations import MutationCaller
-from betterbasequals.call_mutations import MutationValidator
+from betterbasequals.call_mutations import MutationValidator, BaseAdjuster
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from kmerpapa.algorithms import greedy_penalty_plus_pseudo
@@ -64,6 +64,7 @@ def get_parser():
     train_parent = argparse.ArgumentParser(add_help=False)
     train_parent.add_argument('--kmerpapa_method', type=str, default = "greedy",
         help='only consider variants in this region')
+    train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
         help='Number of folds to use when fitting hyperparameters in kmerpapa')
     train_parent.add_argument('-i', '--iterations', type=int, default=1, metavar='i',
@@ -78,7 +79,7 @@ def get_parser():
     # args for printing polished bam:    
     adjust_parent = argparse.ArgumentParser(add_help=False)
     adjust_parent.add_argument('--outbam', type=str,
-        help="Bam file with adjusted base qualities.")
+        help="Bam file with adjusted base qualities.", required=True)
 
     # args for calling somatic variants:    
     call_parent = argparse.ArgumentParser(add_help=False)
@@ -213,6 +214,16 @@ def run_validation(opts, kmer_papas):
     
     validator.call_mutations(opts.chrom, opts.start, opts.end)
 
+def run_adjust(opts, kmer_papas):
+    adjuster = \
+        BaseAdjuster(
+            opts.bam_file,
+            opts.twobit_file, 
+            kmer_papas,
+            opts.outbam)
+    
+    adjuster.call_mutations(opts.chrom, opts.start, opts.end)
+
 
 def main(args = None):
     """
@@ -273,7 +284,7 @@ def main(args = None):
     elif opts.command in ['call', 'call_only']:
         eprint("Call not implemented yet")
     elif opts.command in ['adjust', 'adjust_only']:
-        #outfile = pysam.AlignmentFile(opts.outbam, "w", template=opts.bam_file)
+        run_adjust(opts, kmer_papas)
         eprint("Adjust not implemented yet")   
     else:
         eprint("Unknown command: {opts.command}")

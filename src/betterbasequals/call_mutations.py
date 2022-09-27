@@ -143,14 +143,11 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
                 mut_type = get_mut_type(ref, papa_ref, read.allel)
 
                 #Are ignoring ref alleles pt... should adjust later
-                if read.allel == ref:
-                    n_ref +=1
-                    continue
                 adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
-                change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, adjusted_base_qual1))
-                change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allele, adjusted_base_qual2))
+                change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, int(adjusted_base_qual1)))
+                change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allele, int(adjusted_base_qual2)))
 
             else:
                 #Are ignoring ref alleles pt... should adjust later
@@ -167,7 +164,7 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
         if read.allel != ref:
             mut_type = get_mut_type(ref, papa_ref, read.allel)
             adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
-            change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, adjusted_base_qual))
+            change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, int(adjusted_base_qual)))
 
 
 
@@ -419,14 +416,15 @@ class BaseAdjuster:
         self,
         bam_file,
         twobit_file,
-        kmer_papa
+        kmer_papa,
+        output_bam
     ):
 
         # Open files for reading
         self.bam_file = open_bam_w_index(bam_file)
 
-        # Saves name so I can open file again later
-        self.bam_name = bam_file
+        #Open outputfile for writing
+        self.out_file = pysam.AlignmentFile(output_bam, "wb", template=self.bam_file)
 
         self.tb = py2bit.open(twobit_file)
 
@@ -437,7 +435,7 @@ class BaseAdjuster:
     def __del__(self):
         self.tb.close()
 
-    def call_mutations(self, chrom, start, stop, mapq=50, mapq_filter=20, min_base_qual_filter=20, radius=3, prefix=""):
+    def call_mutations(self, chrom, start, stop, mapq=50, radius=3, prefix=""):
         pileup = self.bam_file.pileup(
             contig=chrom,
             start=start,
@@ -472,6 +470,18 @@ class BaseAdjuster:
                 continue
             
             get_adjustments(pileupcolumn, ref, papa_ref, kmer, self.correction_factor, change_dict)
+
+        for read in self.bam_file.fetch(chrom, start, stop):
+            read_id = (read.query_name, read.is_read1)
+            if read_id in change_dict:
+                for pos, basequal, allele, adjusted_basequal in change_dict[read_id]:
+                    assert(read.query_sequence[pos] == allele)
+                    assert(read.query_qualities[pos] == basequal)
+                    print('correcting: {read_id} pos: {pos}')
+                    read.query_qualities[pos] = adjusted_basequal
+            self.out_file.write(read)
+
+
 
 
             
