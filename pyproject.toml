@@ -44,7 +44,7 @@ mkdocs-material = "^6.2.7"
 mkdocstrings = "^0.15.0"
 
 [tool.poetry.scripts]
-BetterBaseQuals = "betterbasequals.cli:main"
+bbq = "betterbasequals.cli:main"
 
 [tool.black]
 line-length = 120

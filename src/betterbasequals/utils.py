@@ -75,15 +75,16 @@ def eprint(*args, **kwargs):
 
 class Read:
     def __init__(self, pileup_read):
-        pos = pileup_read.query_position
+        self.pos = pileup_read.query_position
         # set attributes
         self.start = pileup_read.alignment.reference_start
         self.end = pileup_read.alignment.reference_end
-        self.allel = pileup_read.alignment.query_sequence[pos]
+        self.allel = pileup_read.alignment.query_sequence[self.pos]
         self.is_reverse = pileup_read.alignment.is_reverse
-        self.base_qual = pileup_read.alignment.query_qualities[pos]
+        self.base_qual = pileup_read.alignment.query_qualities[self.pos]
         self.query_name = pileup_read.alignment.query_name
         self.length = abs(pileup_read.alignment.template_length)
+        self.isR1 = pileup_read.alignment.is_read1
         #self.NH = pileup_read.alignment.get_tag("NH")
 
         # Process cigar stats

@@ -4,6 +4,7 @@ import py2bit
 from betterbasequals.utils import reverse_complement, Read, zip_pileups, open_bam_w_index
 from betterbasequals.pilup_handlers import get_pileup_count
 import os
+from collections import defaultdict
 
 # Mulig PLan:
 # ## Lav liste af alternative alleler og corrected base qual for hver pileup pos
@@ -108,6 +109,66 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
         else:
             n_ref += 1
     return base_quals, n_ref
+
+
+def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change_dict):
+    reads_mem = {}
+
+    for pileup_read in pileupcolumn.pileups:
+        # test for deletion at pileup
+        if pileup_read.is_del or pileup_read.is_refskip:
+            continue
+        #TODO: should consider what the right solution is if there is deletion at overlap
+
+        # fetch read information
+        read = Read(pileup_read)
+
+        # test if read is okay
+        if (
+            read.allel not in "ATGC"
+            or read.start is None
+            or read.end is None
+            #or read.NH != 1
+        ):
+            continue
+
+        # Look for read partner
+        if read.query_name in reads_mem:
+            # found partner process read pair
+            mem_read = reads_mem.pop(read.query_name)
+
+            # We ignore alleles where pair doesn't match (could add else clause to handle)
+            ## Have now done so to test --- Can maybe delete later
+            if read.allel == mem_read.allel:
+                mut_type = get_mut_type(ref, papa_ref, read.allel)
+
+                #Are ignoring ref alleles pt... should adjust later
+                if read.allel == ref:
+                    n_ref +=1
+                    continue
+                adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
+                adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
+                adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
+                change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, adjusted_base_qual1))
+                change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allele, adjusted_base_qual2))
+
+            else:
+                #Are ignoring ref alleles pt... should adjust later
+                if read.allel != ref:
+                    change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, 0))
+                #Are ignoring ref alleles pt... should adjust later
+                if mem_read.allel != ref:
+                    change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allele, 0))
+        else:            
+            reads_mem[read.query_name] = read
+
+    # Handle reads without partner (ie. no overlap)
+    for read in reads_mem.values():
+        if read.allel != ref:
+            mut_type = get_mut_type(ref, papa_ref, read.allel)
+            adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
+            change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, adjusted_base_qual))
+
 
 
 def get_alleles_w_quals(pileupcolumn):
@@ -350,3 +411,67 @@ class MutationValidator:
 #def run_mutation_caller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile, chrom, start, end, radius):
 #    caller = MutationCaller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile)
 #    caller.call_mutations(chrom, start, end, radius=radius)
+
+
+
+class BaseAdjuster:
+    def __init__(
+        self,
+        bam_file,
+        twobit_file,
+        kmer_papa
+    ):
+
+        # Open files for reading
+        self.bam_file = open_bam_w_index(bam_file)
+
+        # Saves name so I can open file again later
+        self.bam_name = bam_file
+
+        self.tb = py2bit.open(twobit_file)
+
+        #assumes that the kmer papa has been turned into phred scaled correction factor
+        self.correction_factor = kmer_papa
+                
+
+    def __del__(self):
+        self.tb.close()
+
+    def call_mutations(self, chrom, start, stop, mapq=50, mapq_filter=20, min_base_qual_filter=20, radius=3, prefix=""):
+        pileup = self.bam_file.pileup(
+            contig=chrom,
+            start=start,
+            stop=stop,
+            truncate=True,
+            min_mapping_quality=mapq,
+            ignore_overlaps=False,
+            flag_require=2,  # proper paired
+            flag_filter=3848,
+        )
+
+        change_dict = defaultdict(list)
+
+        # Fill dict with changes:
+        for pileupcolumn in pileup:
+            ref_pos = pileupcolumn.reference_pos
+            chrom = pileupcolumn.reference_name            
+
+            kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
+            ref = kmer[radius]
+            if 'N' in kmer or len(kmer)!= 2*radius +1:
+                continue            
+
+            if kmer[radius] in ['T', 'G']:
+                kmer = reverse_complement(kmer)
+                papa_ref = reverse_complement(ref)
+            else:
+                papa_ref = ref
+
+            assert len(ref) == 1
+            if ref not in "ATGC":
+                continue
+            
+            get_adjustments(pileupcolumn, ref, papa_ref, kmer, self.correction_factor, change_dict)
+
+
+            

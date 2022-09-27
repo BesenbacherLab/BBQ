@@ -19,7 +19,7 @@ def get_parser():
         An argparse parser.
     """
     parser = argparse.ArgumentParser(
-        prog="BetterBaseQuals",
+        prog="bbq",
         description='''
         Calculates sample-specific base qualities using overlapping reads.
         ''')
@@ -28,7 +28,9 @@ def get_parser():
     parser.add_argument("--verbosity", type=int, default=1)
     parser.add_argument('-V', '--version', action='version', version=f'%(prog)s {__version__}')
 
-    subparsers = parser.add_subparsers(dest='command', help='commands')
+    subparsers = parser.add_subparsers(dest='command', #help='commands',
+        title="required commands",
+        help='Select one of:')
 
     # args bam file:
     bam_parent = argparse.ArgumentParser(add_help=False)
@@ -42,7 +44,6 @@ def get_parser():
     # args for filter bam file
     filter_parent = argparse.ArgumentParser(add_help=False)
     filter_parent.add_argument("--filter_bam_file", help="bam file from blood")
-
 
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
@@ -85,42 +86,52 @@ def get_parser():
         help="output file")
 
     count_parser = subparsers.add_parser('count', 
-        description='Count good and bad k-mers', 
-        parents=[bam_parent, filter_parent, count_parent])
+        description='Count good and bad k-mers',
+        help =  'Count good and bad k-mers',
+        parents=[bam_parent, filter_parent, count_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     train_parser = subparsers.add_parser('train', 
         description='First run "count" then train model to distinguish good and bad k-mers.', 
+        help = 'First run "count" then train model to distinguish good and bad k-mers.',
         parents=[bam_parent, filter_parent, count_parent, train_parent])
 
+    validate_parser = subparsers.add_parser('validate', 
+        description = 'First run "count" and "train" then print validation data',
+        help = 'First run "count" and "train" then print validation data',
+        parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent])
+
+    adjust_parser = subparsers.add_parser('adjust', 
+        description = 'First run "count" and "train" then output bam with adjusted base qualities.', 
+        help = 'First run "count" and "train" then output bam with adjusted base qualities.', 
+        parents = [bam_parent, filter_parent, count_parent, train_parent, adjust_parent])
+
+    call_parser = subparsers.add_parser('call', 
+        description = 'First run "count" and "train" then call variants', 
+        help = 'First run "count" and "train" then call variants', 
+        parents = [bam_parent, count_parent, train_parent, call_parent])
+
     train_only_parser = subparsers.add_parser('train_only', 
-        description='Train model to distinguish good and bad k-mers.', 
-        parents=[train_parent])
+        description = 'Train model to distinguish good and bad k-mers.',
+        help = 'Train model to distinguish good and bad k-mers.',
+        parents = [train_parent])
     train_only_parser.add_argument("--input_file_good", type=argparse.FileType('r'))
     train_only_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
 
-    validate_parser = subparsers.add_parser('validate', 
-        description='First run "count" and "train" then print validation data', 
-        parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent])
-
     validate_only_parser = subparsers.add_parser('validate_only', 
-        description='print validation data.', 
-        parents=[bam_parent, filter_parent, validate_parent]) 
+        description = 'Print validation data.',
+        help = 'Print validation data.', 
+        parents = [bam_parent, filter_parent, validate_parent]) 
     validate_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
     
-    adjust_parser = subparsers.add_parser('adjust', 
-        description='First run "count" and "train" then output bam with adjusted base qualities.', 
-        parents=[bam_parent, filter_parent, count_parent, train_parent, adjust_parent])
-
-    adjust_parser = subparsers.add_parser('adjust_only', 
-        description='Output bam with adjusted base qualities.', 
-        parents=[adjust_parent])
-
-    call_parser = subparsers.add_parser('call', 
-        description='First run "count" and "train" then call variants', 
-        parents=[bam_parent, count_parent, train_parent, call_parent])
+    adjust_only_parser = subparsers.add_parser('adjust_only', 
+        description = 'Output bam with adjusted base qualities.', 
+        help = 'Output bam with adjusted base qualities.',
+        parents = [adjust_parent])
 
     call_only_parser = subparsers.add_parser('call_only', 
-        description='Call variants', 
+        description = 'Call variants',
+        help = 'Call variants',
         parents=[call_parent])
 
     return parser
@@ -218,11 +229,13 @@ def main(args = None):
     parser = get_parser()
     opts = parser.parse_args(args=args)
 
-    #parse_opts_region(opts)
+    if "region" in opts:
+        parse_opts_region(opts)
 
-    #outfile = pysam.AlignmentFile(opts.outbam, "w", template=opts.bam_file)
     
-    print(opts.command)
+    if opts.command is None:
+        parser.print_help(sys.stderr)
+        return 1
 
     print(opts)
 
@@ -260,6 +273,7 @@ def main(args = None):
     elif opts.command in ['call', 'call_only']:
         eprint("Call not implemented yet")
     elif opts.command in ['adjust', 'adjust_only']:
+        #outfile = pysam.AlignmentFile(opts.outbam, "w", template=opts.bam_file)
         eprint("Adjust not implemented yet")   
     else:
         eprint("Unknown command: {opts.command}")
