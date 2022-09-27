@@ -143,6 +143,9 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
                 mut_type = get_mut_type(ref, papa_ref, read.allel)
 
                 #Are ignoring ref alleles pt... should adjust later
+                if read.allel == ref:
+                    continue
+
                 adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
