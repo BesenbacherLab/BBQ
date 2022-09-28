@@ -244,12 +244,10 @@ def main(args = None):
     if "region" in opts:
         parse_opts_region(opts)
 
-    
     if opts.command is None:
         parser.print_help(sys.stderr)
         return 1
 
-    print(opts)
 
     if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only']:
         if opts.verbosity > 0:
