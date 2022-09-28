@@ -128,7 +128,8 @@ def get_parser():
     adjust_only_parser = subparsers.add_parser('adjust_only', 
         description = 'Output bam with adjusted base qualities.', 
         help = 'Output bam with adjusted base qualities.',
-        parents = [adjust_parent])
+        parents = [bam_parent, adjust_parent])
+    adjust_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
 
     call_only_parser = subparsers.add_parser('call_only', 
         description = 'Call variants',
@@ -250,14 +251,14 @@ def main(args = None):
 
     print(opts)
 
-    if not opts.command in ['train_only', 'validation_only', 'call_only', 'adjust_only']:
+    if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only']:
         if opts.verbosity > 0:
             eprint("Counting good and bad kmers")
         if opts.filter_bam_file is None:            
             good_kmers, bad_kmers = run_get_good_and_bad(opts)
         else:
             good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
-    elif opts.train_kmerpapas_only:
+    elif opts.command == 'train_only':
         if opts.verbosity > 0:
             eprint("Reading good and bad kmers")
         good_kmers, bad_kmers = read_kmers(opts)
@@ -265,7 +266,7 @@ def main(args = None):
     if opts.command == 'count':
         return 0
 
-    if not opts.command in ['validation_only', 'call_only', 'adjust_only']:
+    if not opts.command in ['validate_only', 'call_only', 'adjust_only']:
         eprint("Training kmer pattern partitions")
         kmer_papas = run_get_kmerpapas(opts, good_kmers, bad_kmers)
     else:
