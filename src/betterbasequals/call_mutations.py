@@ -26,6 +26,11 @@ from collections import defaultdict
 # P(XXXAXXX->XXXBXXX|fejl) / P(XXXAXXX->XXXBXXX)  = kmer_papa[mtype][kmer] så
 # correction_factor[mtype][kmer] = -10*log10(kmer_papa[mtype][kmer])
 
+### Ny strategi:
+## Udregn korrektion for hver eksisterende base_qual.
+## P(ERROR|XXXAXXX->XXXBXXX, BQ) = P(XXXAXXX->XXXBXXX|ikke match, BQ)/  (P(XXXAXXX->XXXBXXX|ikke match, BQ) + P(XXXAXXX->XXXBXXX|match, BQ))
+
+
 def get_mut_type(ref, papa_ref, alt):
     if ref != papa_ref:
         mtype = papa_ref + '->' + reverse_complement(alt)
@@ -149,16 +154,16 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
                 adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
-                change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, int(adjusted_base_qual1)))
-                change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allele, int(adjusted_base_qual2)))
+                change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allel, int(adjusted_base_qual1), 1))
+                change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allel, int(adjusted_base_qual2), 1))
 
             else:
                 #Are ignoring ref alleles pt... should adjust later
                 if read.allel != ref:
-                    change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, 0))
+                    change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allel, 0, 2))
                 #Are ignoring ref alleles pt... should adjust later
                 if mem_read.allel != ref:
-                    change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allele, 0))
+                    change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allel, 0, 2))
         else:            
             reads_mem[read.query_name] = read
 
@@ -167,7 +172,7 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
         if read.allel != ref:
             mut_type = get_mut_type(ref, papa_ref, read.allel)
             adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
-            change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allele, int(adjusted_base_qual)))
+            change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allel, int(adjusted_base_qual), 3))
 
 
 
@@ -473,16 +478,27 @@ class BaseAdjuster:
                 continue
             
             get_adjustments(pileupcolumn, ref, papa_ref, kmer, self.correction_factor, change_dict)
-
+        n_corrected_reads = 0
+        n_uncorrected_reads = 0
+        n_corrections = 0
+        n_filtered = 0
         for read in self.bam_file.fetch(chrom, start, stop):
+            if read.is_secondary or read.is_supplementary:
+                n_filtered += 1
+                continue
             read_id = (read.query_name, read.is_read1)
             if read_id in change_dict:
-                for pos, basequal, allele, adjusted_basequal in change_dict[read_id]:
+                n_corrected_reads += 1
+                for pos, basequal, allele, adjusted_basequal, atype in change_dict[read_id]:
+                    n_corrections += 1
                     assert(read.query_sequence[pos] == allele)
                     assert(read.query_qualities[pos] == basequal)
-                    print('correcting: {read_id} pos: {pos}')
                     read.query_qualities[pos] = adjusted_basequal
+            else:
+                n_uncorrected_reads += 1
+            #if verbosity > 0:
             self.out_file.write(read)
+        return n_corrections, n_corrected_reads, n_uncorrected_reads, n_filtered
 
 
 

@@ -140,6 +140,8 @@ def get_parser():
 
 
 def run_get_good_and_bad(opts):
+    if opts.verbosity > 0:
+        eprint("Counting good and bad kmers")
     good_kmers, bad_kmers = get_good_and_bad_kmers(
         opts.bam_file,
         opts.twobit_file,
@@ -154,6 +156,8 @@ def run_get_good_and_bad(opts):
     return good_kmers, bad_kmers
 
 def run_get_good_and_bad_w_filter(opts):
+    if opts.verbosity > 0:
+        eprint("Counting good and bad kmers")
     good_kmers, bad_kmers = get_good_and_bad_kmers_w_filter(
         opts.bam_file,
         opts.filter_bam_file,
@@ -170,6 +174,8 @@ def run_get_good_and_bad_w_filter(opts):
 
 
 def run_get_kmerpapas(opts, good_kmers, bad_kmers):
+    if opts.verbosity > 0:
+        eprint("Training kmer pattern partitions")
     kmer_papas = {}
     #pseudo_counts = [1,2,5,10,20,30,50,100,500,1000]
     #penalty_values = range(1,15)
@@ -205,6 +211,8 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
     return kmer_papas
 
 def run_validation(opts, kmer_papas):
+    if opts.verbosity > 0:
+        eprint("Printing validation data")
     validator = \
         MutationValidator(
             opts.bam_file, 
@@ -216,6 +224,8 @@ def run_validation(opts, kmer_papas):
     validator.call_mutations(opts.chrom, opts.start, opts.end)
 
 def run_adjust(opts, kmer_papas):
+    if opts.verbosity > 0:
+        eprint("Adjusting base qualities")
     adjuster = \
         BaseAdjuster(
             opts.bam_file,
@@ -223,7 +233,13 @@ def run_adjust(opts, kmer_papas):
             kmer_papas,
             opts.outbam)
     
-    adjuster.call_mutations(opts.chrom, opts.start, opts.end)
+    n_corrections, n_corrected_reads, n_uncorrected_reads, n_filtered = \
+        adjuster.call_mutations(opts.chrom, opts.start, opts.end)
+
+    if opts.verbosity > 0:
+        eprint(f'corrected {n_corrections} base qualities in {n_corrected_reads} reads')
+        eprint(f'{n_uncorrected_reads} reads were written with no corrections')
+        eprint(f'{n_filtered} reads were filtered')
 
 
 def main(args = None):
@@ -250,22 +266,17 @@ def main(args = None):
 
 
     if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only']:
-        if opts.verbosity > 0:
-            eprint("Counting good and bad kmers")
         if opts.filter_bam_file is None:            
             good_kmers, bad_kmers = run_get_good_and_bad(opts)
         else:
             good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command == 'train_only':
-        if opts.verbosity > 0:
-            eprint("Reading good and bad kmers")
         good_kmers, bad_kmers = read_kmers(opts)
 
     if opts.command == 'count':
         return 0
 
     if not opts.command in ['validate_only', 'call_only', 'adjust_only']:
-        eprint("Training kmer pattern partitions")
         kmer_papas = run_get_kmerpapas(opts, good_kmers, bad_kmers)
     else:
         eprint("Reading kmer pattern partitions")
@@ -284,7 +295,6 @@ def main(args = None):
         eprint("Call not implemented yet")
     elif opts.command in ['adjust', 'adjust_only']:
         run_adjust(opts, kmer_papas)
-        eprint("Adjust not implemented yet")   
     else:
         eprint("Unknown command: {opts.command}")
         return 1

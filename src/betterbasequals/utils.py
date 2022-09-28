@@ -76,6 +76,7 @@ def eprint(*args, **kwargs):
 class Read:
     def __init__(self, pileup_read):
         self.pos = pileup_read.query_position
+
         # set attributes
         self.start = pileup_read.alignment.reference_start
         self.end = pileup_read.alignment.reference_end
@@ -157,6 +158,8 @@ def open_bam_w_index(bam_file):
     return pysam.AlignmentFile(bam_file, "rb")
 
 def read_kmers(opts):
+    if opts.verbosity > 0:
+        eprint("Reading good and bad kmers")
     good_kmers = {}
     for line in opts.input_file_good:
         mtype, kmer, count = line.split()
