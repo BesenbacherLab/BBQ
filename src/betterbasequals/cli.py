@@ -10,6 +10,8 @@ from kmerpapa.algorithms import greedy_penalty_plus_pseudo
 from kmerpapa.pattern_utils import get_M_U
 from math import log10
 
+# TODO: Har sat som constant nu. Lav flexible løsning.
+VALID_BASEQUALS = [11,25,37]
 
 def get_parser():
     """
@@ -160,8 +162,9 @@ def run_get_good_and_bad_w_filter(opts):
         eprint("Counting good and bad kmers")
     good_kmers, bad_kmers = get_good_and_bad_kmers_w_filter(
         opts.bam_file,
-        opts.filter_bam_file,
         opts.twobit_file,
+        opts.filter_bam_file,
+        VALID_BASEQUALS,
         opts.chrom,
         opts.start,
         opts.end,
@@ -179,33 +182,38 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
     kmer_papas = {}
     #pseudo_counts = [1,2,5,10,20,30,50,100,500,1000]
     #penalty_values = range(1,15)
-    for mtype in good_kmers:
-        eprint(f'Handling {mtype}')
-        super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
-        n_good = sum(good_kmers[mtype].values())
-        n_bad = sum(bad_kmers[mtype].values())
-        eprint(mtype, n_bad, n_good)
-        contextD = dict((x, (bad_kmers[mtype][x], good_kmers[mtype][x])) for x in matches(super_pattern))
-        CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
-        best_alpha, best_penalty, test_score = CV.get_best_a_c()
-        my=n_bad/(n_good+n_bad)
-        best_beta = (best_alpha*(1.0-my))/my
-        eprint(best_penalty, best_alpha, best_beta, my)
-        best_score, M, U, names = greedy_penalty_plus_pseudo.greedy_partition(super_pattern, contextD, best_alpha, best_beta, best_penalty, {})
-        counts = []
-        for pat in names:
-            counts.append(get_M_U(pat, contextD))
-        kmer_papas[mtype] = {}
-        for i in range(len(names)):
-            pat = names[i]
-            M, U = counts[i]
-            p = (M + best_alpha)/(M + U + best_alpha + best_beta)
-            if opts.verbosity > 0:
-                eprint(mtype, pat, p, -10*log10(p/(1-p)))
-            if not opts.output_file_kmerpapa is None:
-                print(mtype, pat, -10*log10(p/(1-p)), file=opts.output_file_kmerpapa)
-            for context in matches(pat):
-                kmer_papas[mtype][context] = -10*log10(p/(1-p))
+    for bqual in good_kmers:
+        kmer_papas[bqual] = {}
+        eprint(f'Handling base_qual: {bqual}')
+        for mtype in good_kmers[bqual]:
+            eprint(f'Handling mutation type: {mtype}')
+            radius = len(next(iter(good_kmers[bqual]["A->C"].keys())))//2
+            super_pattern = 'N'*radius + mtype[0] + 'N'*radius
+            n_good = sum(good_kmers[bqual][mtype].values())
+            n_bad = sum(bad_kmers[bqual][mtype].values())
+            eprint(mtype, n_bad, n_good)
+            contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
+            CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
+            best_alpha, best_penalty, test_score = CV.get_best_a_c()
+            my=n_bad/(n_good+n_bad)
+            best_beta = (best_alpha*(1.0-my))/my
+            eprint(best_penalty, best_alpha, best_beta, my)
+            best_score, M, U, names = greedy_penalty_plus_pseudo.greedy_partition(super_pattern, contextD, best_alpha, best_beta, best_penalty, {})
+            counts = []
+            for pat in names:
+                counts.append(get_M_U(pat, contextD))
+            kmer_papas[bqual][mtype] = {}
+            for i in range(len(names)):
+                pat = names[i]
+                M, U = counts[i]
+                p = (M + best_alpha)/(M + U + best_alpha + best_beta)
+                if opts.verbosity > 0:
+                    eprint(mtype, pat, p, -10*log10(p/(1-p)))
+                if not opts.output_file_kmerpapa is None:
+                    print(bqual, mtype, pat, -10*log10(p), file=opts.output_file_kmerpapa)
+                    #print(bqual, mtype, pat, -10*log10(p/(1-p)), file=opts.output_file_kmerpapa)
+                for context in matches(pat):
+                    kmer_papas[bqual][mtype][context] = -10*log10(p)
     if not opts.output_file_kmerpapa is None:
         opts.output_file_kmerpapa.close()
     return kmer_papas
@@ -266,10 +274,10 @@ def main(args = None):
 
 
     if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only']:
-        if opts.filter_bam_file is None:            
-            good_kmers, bad_kmers = run_get_good_and_bad(opts)
-        else:
-            good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
+        #if opts.filter_bam_file is None:            
+        #    good_kmers, bad_kmers = run_get_good_and_bad(opts)
+        #else:
+        good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command == 'train_only':
         good_kmers, bad_kmers = read_kmers(opts)
 
@@ -289,7 +297,6 @@ def main(args = None):
         return 0
 
     if opts.command in ['validate', 'validate_only']:
-        eprint("Running validation")
         run_validation(opts, kmer_papas)
     elif opts.command in ['call', 'call_only']:
         eprint("Call not implemented yet")

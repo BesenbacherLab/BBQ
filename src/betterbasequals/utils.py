@@ -162,41 +162,52 @@ def read_kmers(opts):
         eprint("Reading good and bad kmers")
     good_kmers = {}
     for line in opts.input_file_good:
-        mtype, kmer, count = line.split()
-        if mtype not in good_kmers:
-            good_kmers[mtype] = {}
-        good_kmers[mtype][kmer] = int(count)
+        bqual, mtype, kmer, count = line.split()
+        bqual = int(bqual)
+        if bqual not in good_kmers:
+            good_kmers[bqual] = {}
+        if mtype not in good_kmers[bqual]:
+            good_kmers[bqual][mtype] = {}
+        good_kmers[bqual][mtype][kmer] = int(count)
 
     bad_kmers = {}
     for line in opts.input_file_bad:
-        mtype, kmer, count = line.split()
-        if mtype not in bad_kmers:
-            bad_kmers[mtype] = {}
-        bad_kmers[mtype][kmer] = int(count)
+        bqual, mtype, kmer, count = line.split()
+        bqual = int(bqual)
+        if bqual not in bad_kmers:
+            bad_kmers[bqual] = {}
+        if mtype not in bad_kmers[bqual]:
+            bad_kmers[bqual][mtype] = {}
+        bad_kmers[bqual][mtype][kmer] = int(count)
     return good_kmers, bad_kmers
 
 def read_kmer_papas(opts):
     kmer_papas = {}
     for line in opts.input_file_kmerpapa:
-        mtype, pattern, correction_factor = line.split()
-        if mtype not in kmer_papas:
-            kmer_papas[mtype] = {}
+        bqual, mtype, pattern, correction_factor = line.split()
+        bqual=int(bqual)
+        if bqual not in kmer_papas:
+            kmer_papas[bqual] = {}
+        if mtype not in kmer_papas[bqual]:
+            kmer_papas[bqual][mtype] = {}
         for context in matches(pattern):
-            kmer_papas[mtype][context] = float(correction_factor)
+            kmer_papas[bqual][mtype][context] = float(correction_factor)
     return kmer_papas
 
 def print_good_and_bad(opts, good_kmers, bad_kmers):
     if not opts.output_file_good is None:
-        for mtype in mtypes:
-            super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
-            for kmer in  matches(super_pattern):
-                print(mtype, kmer, good_kmers[mtype][kmer] , file = opts.output_file_good)
+        for bqual in good_kmers:
+            for mtype in mtypes:
+                super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
+                for kmer in matches(super_pattern):
+                    print(bqual, mtype, kmer, good_kmers[bqual][mtype][kmer] , file = opts.output_file_good)
         opts.output_file_good.close()
     if not opts.output_file_bad is None:
-        for mtype in mtypes:
-            super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
-            for kmer in matches(super_pattern):
-                print(mtype, kmer, bad_kmers[mtype][kmer], file = opts.output_file_bad)
+        for bqual in bad_kmers:
+            for mtype in mtypes:
+                super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
+                for kmer in matches(super_pattern):
+                    print(bqual, mtype, kmer, bad_kmers[bqual][mtype][kmer], file = opts.output_file_bad)
         opts.output_file_bad.close()
 
 def parse_opts_region(opts):
