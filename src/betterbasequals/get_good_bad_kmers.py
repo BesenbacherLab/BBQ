@@ -63,7 +63,7 @@ class MutationFinderWFilter:
             )
             for pileupcolumn, filter_pc in zip_pileups(pileup, filter_pileup):
                 N_filter = 0
-                for pc in filter_pc:
+                for pread in filter_pc.pileups:
                     N_filter += 1
                 #TODO: replace hardcoded numbers with values relative to mean coverage
                 if N_filter < 25 or N_filter > 55:
