@@ -420,6 +420,7 @@ class MutationValidator:
             ignore_overlaps=False,
             flag_require=2,  # proper paired
             flag_filter=3848,
+            min_base_quality = 1,
         )
         filter_pileup = self.filter_bam_file.pileup(
             contig=chrom,
@@ -485,10 +486,8 @@ class MutationValidator:
                 corr_var_qual2 = sum(x[1] for x in corrected_base_quals[A])
                 uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
                 for corrected_Q, corrected_Q2, uncorrected_Q, base_type in corrected_base_quals[A]:
-                    print(chrom, ref_pos, ref, A, corrected_Q, uncorrected_Q, corrected_Q2, base_type, n_alt + n_ref, corr_var_qual, corr_var_qual2, uncorr_var_qual, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
+                    print(chrom, ref_pos, A, int(corrected_Q), uncorrected_Q, base_type, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
                 #yield (chrom, ref_pos, ref, A, corrected_base_quals[A], n_alt + n_ref, sum(hifi_basequals[A]))
-
-
 
 
 #def run_mutation_caller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile, chrom, start, end, radius):
