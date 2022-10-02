@@ -194,6 +194,15 @@ def read_kmer_papas(opts):
             kmer_papas[bqual][mtype][context] = float(correction_factor)
     return kmer_papas
 
+def print_kmer_papas(opts, kmer_papas):
+    if not opts.output_file_kmerpapa is None:
+        for bqual in kmer_papas:
+            for mtype in kmer_papas[bqual]:
+                for pat in kmer_papas[bqual][mtype]:
+                    Q = kmer_papas[bqual][mtype][pat]
+                    print(bqual, mtype, pat, Q, file=opts.output_file_kmerpapa)
+        opts.output_file_kmerpapa.close()
+
 def print_good_and_bad(opts, good_kmers, bad_kmers):
     if not opts.output_file_good is None:
         for bqual in good_kmers:

@@ -6,9 +6,7 @@ from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers, get_good_
 from betterbasequals.call_mutations import MutationValidator, BaseAdjuster
 from betterbasequals.utils import *
 from betterbasequals import __version__
-from kmerpapa.algorithms import greedy_penalty_plus_pseudo
-from kmerpapa.pattern_utils import get_M_U
-from math import log10
+from betterbasequals.kmerpapa_utils import *
 
 # TODO: Har sat som constant nu. Lav flexible løsning.
 VALID_BASEQUALS = [11,25,37]
@@ -65,7 +63,8 @@ def get_parser():
     # args for training models:    
     train_parent = argparse.ArgumentParser(add_help=False)
     train_parent.add_argument('--kmerpapa_method', type=str, default = "greedy",
-        help='only consider variants in this region')
+        help='only consider variants in this region',
+        choices=['greedy', 'optimal'])
     train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
         help='Number of folds to use when fitting hyperparameters in kmerpapa')
@@ -180,8 +179,7 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
     if opts.verbosity > 0:
         eprint("Training kmer pattern partitions")
     kmer_papas = {}
-    #pseudo_counts = [1,2,5,10,20,30,50,100,500,1000]
-    #penalty_values = range(1,15)
+
     for bqual in good_kmers:
         kmer_papas[bqual] = {}
         eprint(f'Handling base_qual: {bqual}')
@@ -189,33 +187,24 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
             eprint(f'Handling mutation type: {mtype}')
             radius = len(next(iter(good_kmers[bqual]["A->C"].keys())))//2
             super_pattern = 'N'*radius + mtype[0] + 'N'*radius
-            n_good = sum(good_kmers[bqual][mtype].values())
-            n_bad = sum(bad_kmers[bqual][mtype].values())
-            eprint(mtype, n_bad, n_good)
-            contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
-            CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
-            best_alpha, best_penalty, test_score = CV.get_best_a_c()
-            my=n_bad/(n_good+n_bad)
-            best_beta = (best_alpha*(1.0-my))/my
-            eprint(best_penalty, best_alpha, best_beta, my)
-            best_score, M, U, names = greedy_penalty_plus_pseudo.greedy_partition(super_pattern, contextD, best_alpha, best_beta, best_penalty, {})
-            counts = []
-            for pat in names:
-                counts.append(get_M_U(pat, contextD))
+            eprint(mtype, end=" ")
+            contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))            
+            if opts.kmerpapa_method == 'greedy':
+                kpp = get_greedy_kmerpapa(super_pattern, contextD, opts)
+            elif opts.kmerpapa_method == 'optimal':
+                kpp = get_optimal_kmerpapa(super_pattern, contextD, opts)
             kmer_papas[bqual][mtype] = {}
-            for i in range(len(names)):
-                pat = names[i]
-                M, U = counts[i]
-                p = (M + best_alpha)/(M + U + best_alpha + best_beta)
-                if opts.verbosity > 0:
-                    eprint(mtype, pat, p, -10*log10(p/(1-p)))
+            for pat in kpp:
                 if not opts.output_file_kmerpapa is None:
-                    print(bqual, mtype, pat, -10*log10(p), file=opts.output_file_kmerpapa)
-                    #print(bqual, mtype, pat, -10*log10(p/(1-p)), file=opts.output_file_kmerpapa)
+                    print(bqual, mtype, pat, kpp[pat], file=opts.output_file_kmerpapa)
+                if opts.verbosity > 1:
+                    eprint(bqual, mtype, pat, kpp[pat])
                 for context in matches(pat):
-                    kmer_papas[bqual][mtype][context] = -10*log10(p)
+                    kmer_papas[bqual][mtype][context] = kpp[pat]
+    
     if not opts.output_file_kmerpapa is None:
         opts.output_file_kmerpapa.close()
+    
     return kmer_papas
 
 def run_validation(opts, kmer_papas):
@@ -272,11 +261,7 @@ def main(args = None):
         parser.print_help(sys.stderr)
         return 1
 
-
     if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only']:
-        #if opts.filter_bam_file is None:            
-        #    good_kmers, bad_kmers = run_get_good_and_bad(opts)
-        #else:
         good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command == 'train_only':
         good_kmers, bad_kmers = read_kmers(opts)
@@ -290,9 +275,6 @@ def main(args = None):
         eprint("Reading kmer pattern partitions")
         kmer_papas = read_kmer_papas(opts)
 
-    # for x in kmer_papas:
-    #     eprint(x)
-
     if opts.command in ['train_only', 'train']:
         return 0
 
@@ -305,18 +287,6 @@ def main(args = None):
     else:
         eprint("Unknown command: {opts.command}")
         return 1
-
-    #caller = MutationCaller(opts.bam_file, opts.filter_bam_file, opts.twobit_file, kmer_papas)
-
-    # run_mutation_caller(
-    #     opts.bam_file, 
-    #     opts.filter_bam_file, 
-    #     opts.twobit_file, 
-    #     chrom, 
-    #     start, 
-    #     end, 
-    #     opts.radius,
-    # )
 
     return 0
 
