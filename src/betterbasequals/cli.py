@@ -1,7 +1,7 @@
 """Module that contains the command line application."""
 
 import argparse
-from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers, get_good_and_bad_kmers_w_filter
+from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers_w_filter
 #from betterbasequals.call_mutations import MutationCaller
 from betterbasequals.call_mutations import MutationValidator, BaseAdjuster
 from betterbasequals.utils import *
@@ -72,6 +72,7 @@ def get_parser():
         help='Repeat cross validation i times when fitting hyperparameters in kmerpapa')
     train_parent.add_argument('--seed', type=int,
         help='seed for numpy.random')
+    train_parent.add_argument('--same_good', action='store_true')
 
     # args for validating models:    
     validate_parent = argparse.ArgumentParser(add_help=False)
@@ -188,7 +189,10 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
             radius = len(next(iter(good_kmers[bqual]["A->C"].keys())))//2
             super_pattern = 'N'*radius + mtype[0] + 'N'*radius
             eprint(mtype, end=" ")
-            contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))            
+            if opts.same_good:
+                contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][mtype][x])) for x in matches(super_pattern))
+            else:
+                contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
             if opts.kmerpapa_method == 'greedy':
                 kpp = get_greedy_kmerpapa(super_pattern, contextD, opts)
             elif opts.kmerpapa_method == 'optimal':
