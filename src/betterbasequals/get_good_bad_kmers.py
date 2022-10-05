@@ -116,8 +116,8 @@ class MutationFinderWFilter:
                 # We ignore alleles where pair doesn't match (could add else clause to handle)
                 if read.allel == mem_read.allel:
                     #Are ignoring ref alleles pt... should adjust later
-                    if read.allel == ref:
-                        continue
+                    #if read.allel == ref:
+                    #    continue
 
                     mut_type = get_mut_type(ref, read.allel)     
                     event_list.append(('good', mut_type, read.base_qual))

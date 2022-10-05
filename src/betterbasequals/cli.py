@@ -63,8 +63,11 @@ def get_parser():
     # args for training models:    
     train_parent = argparse.ArgumentParser(add_help=False)
     train_parent.add_argument('--kmerpapa_method', type=str, default = "greedy",
-        help='only consider variants in this region',
+        help='algorithm to use for calculating kmer-papas',
         choices=['greedy', 'optimal'])
+    train_parent.add_argument('--correction_type', type=str, default = "bad_vs_good",
+        help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
+        choices=["bad_vs_good", "bad_vs_no"])
     train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
         help='Number of folds to use when fitting hyperparameters in kmerpapa')
@@ -181,18 +184,26 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
         eprint("Training kmer pattern partitions")
     kmer_papas = {}
 
-    for bqual in good_kmers:
+    for bqual in bad_kmers:
         kmer_papas[bqual] = {}
         eprint(f'Handling base_qual: {bqual}')
-        for mtype in good_kmers[bqual]:
+        for mtype in bad_kmers[bqual]:
             eprint(f'Handling mutation type: {mtype}')
             radius = len(next(iter(good_kmers[bqual]["A->C"].keys())))//2
             super_pattern = 'N'*radius + mtype[0] + 'N'*radius
             eprint(mtype, end=" ")
-            if opts.same_good:
-                contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][mtype][x])) for x in matches(super_pattern))
-            else:
-                contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
+            if opts.correction_type == "bad_vs_good":
+                if opts.same_good:
+                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][mtype][x])) for x in matches(super_pattern))
+                else:
+                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
+            elif opts.correction_type == "bad_vs_no":
+                ref = mtype[0]
+                notype = f'{ref}->{ref}'
+                if opts.same_good:
+                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][notype][x])) for x in matches(super_pattern))
+                else:
+                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][notype][x])) for x in matches(super_pattern))
             if opts.kmerpapa_method == 'greedy':
                 kpp = get_greedy_kmerpapa(super_pattern, contextD, opts)
             elif opts.kmerpapa_method == 'optimal':
