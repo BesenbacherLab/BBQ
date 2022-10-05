@@ -6,7 +6,9 @@ from functools import reduce, partial
 import pysam
 import os
 
-mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T')
+#mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T')
+mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'A->A', 'C->C')
+
 
 complement = str.maketrans("ATCGN", "TAGCN")
 
