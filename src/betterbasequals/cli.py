@@ -188,6 +188,8 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
         kmer_papas[bqual] = {}
         eprint(f'Handling base_qual: {bqual}')
         for mtype in bad_kmers[bqual]:
+            if mtype[0] == mtype[-1]:
+                continue
             eprint(f'Handling mutation type: {mtype}')
             radius = len(next(iter(good_kmers[bqual]["A->C"].keys())))//2
             super_pattern = 'N'*radius + mtype[0] + 'N'*radius
