@@ -86,6 +86,8 @@ class MutationFinderWFilter:
         ref = kmer[radius]
         if ref not in "ATGC":
             return
+        if ref not in ['A', 'C']:
+            kmer = reverse_complement(kmer)
 
         reads_mem = dict()
         event_list = []
