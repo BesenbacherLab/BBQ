@@ -83,8 +83,11 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
                 if read.allel == ref:
                     n_ref +=1
                     continue
-                adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
-                adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
+                #adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
+                #adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
+
+                adjusted_base_qual1 = correction_factor[mut_type][kmer]
+                adjusted_base_qual2 = correction_factor[mut_type][kmer]
                 adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
                 unadjusted_base_qual = read.base_qual # vælger tilfældig. Kunne også tage max, min  eller sum?
                 base_quals[read.allel].append((adjusted_base_qual1 + adjusted_base_qual2, max(adjusted_base_qual1, adjusted_base_qual2), unadjusted_base_qual, 1))
@@ -109,6 +112,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
     for read in reads_mem.values():
         if read.allel != ref:
             mut_type = get_mut_type(ref, papa_ref, read.allel)
+            #adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
             adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
             base_quals[read.allel].append((adjusted_base_qual, adjusted_base_qual, read.base_qual, 3))
         else:

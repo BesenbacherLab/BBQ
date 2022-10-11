@@ -201,11 +201,13 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
                     contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
             elif opts.correction_type == "bad_vs_no":
                 ref = mtype[0]
+                alt = mtype[-1]
                 notype = f'{ref}->{ref}'
+                other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
                 if opts.same_good:
                     contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][notype][x])) for x in matches(super_pattern))
                 else:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][notype][x])) for x in matches(super_pattern))
+                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][notype][x] + bad_kmers[bqual][other_type1][x] + bad_kmers[bqual][other_type2][x])) for x in matches(super_pattern))
             if opts.kmerpapa_method == 'greedy':
                 kpp = get_greedy_kmerpapa(super_pattern, contextD, opts)
             elif opts.kmerpapa_method == 'optimal':
