@@ -65,7 +65,7 @@ def get_parser():
     train_parent.add_argument('--kmerpapa_method', type=str, default = "greedy",
         help='algorithm to use for calculating kmer-papas',
         choices=['greedy', 'optimal'])
-    train_parent.add_argument('--correction_type', type=str, default = "bad_vs_good",
+    train_parent.add_argument('--correction_type', type=str, default = "bad_vs_no",
         help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
         choices=["bad_vs_good", "bad_vs_no"])
     train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))

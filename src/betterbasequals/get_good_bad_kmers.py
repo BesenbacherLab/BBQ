@@ -33,7 +33,7 @@ class MutationFinderWFilter:
     def __del__(self):
         self.tb.close()
 
-    def find_mutations(self, chrom, start, stop, mapq=50, min_base_qual=1, filter_mapq =20, min_base_qual_filter=20, min_depth=1, max_depth=5000, radius=3, prefix="",):
+    def find_mutations(self, chrom, start, stop, mapq=50, min_base_qual=1, filter_mapq=20, min_base_qual_filter=20, min_depth=1, max_depth=5000, radius=3, prefix="",max_bad_alt=4):
         good_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
         bad_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
         pileup = self.bam_file.pileup(
@@ -66,14 +66,14 @@ class MutationFinderWFilter:
                 #TODO: replace hardcoded numbers with values relative to mean coverage
                 if N_filter < 25 or N_filter > 55:
                     continue
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius)
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius, max_bad_alt)
         else:
             for pileupcolumn in pileup:
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius)
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius, max_bad_alt)
         
         return good_kmers, bad_kmers
 
-    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius):
+    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius, max_bad_alt):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
@@ -92,6 +92,10 @@ class MutationFinderWFilter:
         reads_mem = dict()
         event_list = []
         coverage = 0
+
+        has_good = set()
+        n_allele = Counter()
+
         for pileup_read in pileupcolumn.pileups:
             # test for deletion at pileup
             if pileup_read.is_del or pileup_read.is_refskip:
@@ -102,6 +106,7 @@ class MutationFinderWFilter:
             # fetch read information
             read = Read(pileup_read)
 
+
             # test if read is okay
             if (
                 read.allel not in "ATGC"
@@ -110,6 +115,10 @@ class MutationFinderWFilter:
                 #or read.NH != 1
             ):
                 continue
+
+            if read.base_qual > 30:
+                n_allele[read.allel] += 1
+
             # Look for read partner
             if read.query_name in reads_mem:
                 # found partner process read pair
@@ -117,32 +126,31 @@ class MutationFinderWFilter:
 
                 # We ignore alleles where pair doesn't match (could add else clause to handle)
                 if read.allel == mem_read.allel:
-                    #Are ignoring ref alleles pt... should adjust later
-                    #if read.allel == ref:
-                    #    continue
-
-                    mut_type = get_mut_type(ref, read.allel)     
-                    event_list.append(('good', mut_type, read.base_qual))
-                    event_list.append(('good', mut_type, mem_read.base_qual))
+                    event_list.append(('good', read.allel, read.base_qual))
+                    event_list.append(('good', read.allel, mem_read.base_qual))
+                    
+                    if max(read.base_qual, mem_read.base_qual) > 30:
+                        has_good.add(read.allel)
 
                 else:
                     #Are ignoring ref alleles pt... should adjust later
+
                     if read.allel != ref:
-                        mut_type = get_mut_type(ref, read.allel)
-                        event_list.append(('bad', mut_type, read.base_qual))
+                        event_list.append(('bad', read.allel, read.base_qual))
 
                     elif mem_read.allel != ref:
-                        mut_type = get_mut_type(ref, mem_read.allel)
-                        event_list.append(('bad', mut_type, mem_read.base_qual))
+                        event_list.append(('bad', mem_read.allel, mem_read.base_qual))
             else:            
                 reads_mem[read.query_name] = read
         if coverage < min_depth or coverage > max_depth:
             return
-        for event_type, mut_type, base_qual in event_list:
+        for event_type, allele, base_qual in event_list:
+            mut_type = get_mut_type(ref, allele)     
             if event_type == 'good':
                 good_kmers[base_qual][mut_type][kmer] += 1
             elif event_type == 'bad':
-                bad_kmers[base_qual][mut_type][kmer] += 1
+                if allele not in has_good and n_allele[allele] < max_bad_alt:
+                    bad_kmers[base_qual][mut_type][kmer] += 1
 
 def get_good_and_bad_kmers_w_filter(bam_file, twobit_file, filter_bam_file, basequals, chrom, start, end, min_depth, max_depth, radius):
     finder = MutationFinderWFilter(bam_file, twobit_file, filter_bam_file, basequals)

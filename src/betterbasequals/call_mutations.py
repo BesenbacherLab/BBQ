@@ -6,30 +6,6 @@ from betterbasequals.pilup_handlers import get_pileup_count
 import os
 from collections import defaultdict
 
-# Mulig PLan:
-# ## Lav liste af alternative alleler og corrected base qual for hver pileup pos
-# ## base qual bør håndteres på log skala.
-# ## correction_factor[mtype][kmer] = -10*log10(kmer_papa[mtype][kmer] / (1-kmer_papa[mtype][kmer]))
-# Ideen er at vi udregner:
-# P(XXXAXXX->XXXBXXX|fejl)*P(fejl) / P(XXXAXXX->XXXBXXX)
-# P(fejl) er base_qual
-# kmer_papa udregner sandsynligheden : 
-#    P(XXXAXXX->XXXBXXX|fejl)/(P(XXXAXXX->XXXBXXX|fejl) + P(XXXAXXX->XXXBXXX))
-#  så kmer_papa[mtype][kmer] / (1-kmer_papa[mtype][kmer]) er  lig med  P(XXXAXXX->XXXBXXX|fejl) / P(XXXAXXX->XXXBXXX)
-# p = A / (A+B)
-# 1-p = B /(A+B)
-# p/(1-p) = A/B
-# Evt. sæt A->A i correction factor så det svarer til sandsynlighederne for ikke at se fejl.
-# Ellers skal jeg kun se på alt alleler i nedenstående funktion.
-# #######  Correction ########
-# Måske skal jeg antage at:
-# P(XXXAXXX->XXXBXXX|fejl) / P(XXXAXXX->XXXBXXX)  = kmer_papa[mtype][kmer] så
-# correction_factor[mtype][kmer] = -10*log10(kmer_papa[mtype][kmer])
-
-### Ny strategi:
-## Udregn korrektion for hver eksisterende base_qual.
-## P(ERROR|XXXAXXX->XXXBXXX, BQ) = P(XXXAXXX->XXXBXXX|ikke match, BQ)/  (P(XXXAXXX->XXXBXXX|ikke match, BQ) + P(XXXAXXX->XXXBXXX|match, BQ))
-
 
 def get_mut_type(ref, papa_ref, alt):
     if ref != papa_ref:
@@ -37,6 +13,7 @@ def get_mut_type(ref, papa_ref, alt):
     else:
         mtype = papa_ref + '->' + alt
     return mtype
+
 
 
 def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_factor):
@@ -113,7 +90,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
         if read.allel != ref:
             mut_type = get_mut_type(ref, papa_ref, read.allel)
             #adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
-            adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
+            adjusted_base_qual = correction_factor[mut_type][kmer]
             base_quals[read.allel].append((adjusted_base_qual, adjusted_base_qual, read.base_qual, 3))
         else:
             n_ref += 1
@@ -122,11 +99,14 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
 
 
 def get_validation_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_factor):
-    ### Har ændret så den nu lave tuple med (corrected, uncorrected, type) base_quals
-    ### type: 
-    # 1) Matchende par i overlap
-    # 2) ikke-matchende par i overlap
-    # 3) base uden for overlap
+    """
+    Returns a dictionary form alleles to list of tuples of the form: (adjusted_BQ, old_BQ, type)
+    Where type is:
+    1) Match in overlap
+    2) Mismatch in overlap
+    3) Base with no overlap.
+    """
+
     reads_mem = {}
     base_quals = {'A':[], 'C':[], 'G':[], 'T':[]}
 
@@ -168,19 +148,17 @@ def get_validation_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, 
                 adjusted_base_qual1 = correction_factor[read.base_qual][mut_type][kmer]
                 adjusted_base_qual2 = correction_factor[mem_read.base_qual][mut_type][kmer]
                 adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
-                unadjusted_base_qual = read.base_qual # vælger tilfældig. Kunne også tage max, min  eller sum?
-                base_quals[read.allel].append((adjusted_base_qual1 + adjusted_base_qual2, max(adjusted_base_qual1, adjusted_base_qual2), unadjusted_base_qual, 1))
+                unadjusted_base_qual = max(read.base_qual, mem_read.base_qual)
+                base_quals[read.allel].append((adjusted_base_qual1 + adjusted_base_qual2, unadjusted_base_qual, 1))
             else:
                 #Are ignoring ref alleles pt... should adjust later
                 if read.allel != ref:
-                    #mut_type = get_mut_type(ref, papa_ref, read.allel)
-                    base_quals[read.allel].append((0, 0, read.base_qual, 2))
+                    base_quals[read.allel].append((0, read.base_qual, 2))
                 else:
                     n_ref += 1
                 #Are ignoring ref alleles pt... should adjust later
                 if mem_read.allel != ref:
-                    #mut_type = get_mut_type(ref, papa_ref, mem_read.allel)
-                    base_quals[read.allel].append((0, 0, mem_read.base_qual, 2))
+                    base_quals[read.allel].append((0, mem_read.base_qual, 2))
                 else:
                     n_ref += 1
 
@@ -192,7 +170,7 @@ def get_validation_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, 
         if read.allel != ref:
             mut_type = get_mut_type(ref, papa_ref, read.allel)
             adjusted_base_qual = correction_factor[read.base_qual][mut_type][kmer]
-            base_quals[read.allel].append((adjusted_base_qual, adjusted_base_qual, read.base_qual, 3))
+            base_quals[read.allel].append((adjusted_base_qual, read.base_qual, 3))
         else:
             n_ref += 1
     return base_quals, n_ref
@@ -489,15 +467,8 @@ class MutationValidator:
                 corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
                 corr_var_qual2 = sum(x[1] for x in corrected_base_quals[A])
                 uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
-                for corrected_Q, corrected_Q2, uncorrected_Q, base_type in corrected_base_quals[A]:
+                for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
                     print(chrom, ref_pos, A, int(corrected_Q), uncorrected_Q, base_type, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
-                #yield (chrom, ref_pos, ref, A, corrected_base_quals[A], n_alt + n_ref, sum(hifi_basequals[A]))
-
-
-#def run_mutation_caller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile, chrom, start, end, radius):
-#    caller = MutationCaller(bam_file, filter_bam_file, twobit_file, kmerpapa, outfile)
-#    caller.call_mutations(chrom, start, end, radius=radius)
-
 
 
 class BaseAdjuster:
@@ -577,7 +548,7 @@ class BaseAdjuster:
                     read.query_qualities[pos] = adjusted_basequal
             else:
                 n_uncorrected_reads += 1
-            #if verbosity > 0:
+
             self.out_file.write(read)
         return n_corrections, n_corrected_reads, n_uncorrected_reads, n_filtered
 
