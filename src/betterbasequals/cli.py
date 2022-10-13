@@ -78,7 +78,7 @@ def get_parser():
 
     # args for validating models:    
     validate_parent = argparse.ArgumentParser(add_help=False)
-    validate_parent.add_argument("--validation_bam_file", help="hifi bam file")
+    validate_parent.add_argument("--validation_bam_file", help="hifi bam file", required=True)
 
     # args for printing polished bam:    
     adjust_parent = argparse.ArgumentParser(add_help=False)
@@ -219,7 +219,6 @@ def run_validation(opts, kmer_papas):
             opts.validation_bam_file, 
             opts.twobit_file, 
             kmer_papas)
-    
     validator.call_mutations(opts.chrom, opts.start, opts.end)
 
 def run_adjust(opts, kmer_papas):
