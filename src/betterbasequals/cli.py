@@ -2,13 +2,12 @@
 
 import argparse
 from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers_w_filter
-#from betterbasequals.call_mutations import MutationCaller
-from betterbasequals.call_mutations import MutationValidator, BaseAdjuster
+from betterbasequals.call_mutations import MutationValidator, BaseAdjuster, MutationCaller
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from betterbasequals.kmerpapa_utils import *
 
-# TODO: Har sat som constant nu. Lav flexible løsning.
+# TODO: Possible input basequalities are hardcoded. Should make flexible solution.
 VALID_BASEQUALS = [11,25,37]
 
 def get_parser():
@@ -143,22 +142,6 @@ def get_parser():
 
     return parser
 
-
-def run_get_good_and_bad(opts):
-    if opts.verbosity > 0:
-        eprint("Counting good and bad kmers")
-    good_kmers, bad_kmers = get_good_and_bad_kmers(
-        opts.bam_file,
-        opts.twobit_file,
-        opts.chrom,
-        opts.start,
-        opts.end,
-        opts.min_depth,
-        opts.max_depth,
-        opts.radius,
-    )
-    print_good_and_bad(opts, good_kmers, bad_kmers)
-    return good_kmers, bad_kmers
 
 def run_get_good_and_bad_w_filter(opts):
     if opts.verbosity > 0:
@@ -301,6 +284,7 @@ def main(args = None):
         run_validation(opts, kmer_papas)
     elif opts.command in ['call', 'call_only']:
         eprint("Call not implemented yet")
+        return 1
     elif opts.command in ['adjust', 'adjust_only']:
         run_adjust(opts, kmer_papas)
     else:
