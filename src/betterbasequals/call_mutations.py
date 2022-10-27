@@ -127,8 +127,11 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
                 if read.allel == ref:
                     continue
 
-                adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
-                adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
+                adjusted_base_qual1 = correction_factor[read.base_qual][mut_type][kmer]
+                adjusted_base_qual2 = correction_factor[mem_read.base_qual][mut_type][kmer]
+
+                #adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
+                #adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
                 adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
                 change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allel, int(adjusted_base_qual1), 1))
                 change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allel, int(adjusted_base_qual2), 1))
