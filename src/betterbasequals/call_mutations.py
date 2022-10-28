@@ -151,7 +151,7 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
     for read in reads_mem.values():
         if read.allel != ref:
             mut_type = get_mut_type(ref, papa_ref, read.allel)
-            adjusted_base_qual = read.base_qual + correction_factor[mut_type][kmer]
+            adjusted_base_qual = correction_factor[read.base_qual][mut_type][kmer]
             change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allel, int(adjusted_base_qual), 3))
 
 
