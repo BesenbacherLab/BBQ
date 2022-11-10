@@ -84,6 +84,7 @@ def get_parser():
     adjust_parent = argparse.ArgumentParser(add_help=False)
     adjust_parent.add_argument('--outbam', type=str,
         help="Bam file with adjusted base qualities.", required=True)
+    adjust_parent.add_argument("--output_adjustments", type=argparse.FileType('w'))
 
     # args for calling somatic variants:    
     call_parent = argparse.ArgumentParser(add_help=False)
@@ -229,7 +230,9 @@ def run_adjust(opts, kmer_papas):
             opts.bam_file,
             opts.twobit_file, 
             kmer_papas,
-            opts.outbam)
+            opts.outbam,
+            opts.output_adjustments,
+        )
     
     n_corrections, n_corrected_reads, n_uncorrected_reads, n_filtered = \
         adjuster.call_mutations(opts.chrom, opts.start, opts.end)

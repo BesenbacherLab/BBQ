@@ -1,6 +1,7 @@
 from math import log10
 import pysam
 import py2bit
+import sys
 from betterbasequals.utils import reverse_complement, Read, zip_pileups, open_bam_w_index
 from betterbasequals.pilup_handlers import get_pileup_count
 from collections import defaultdict
@@ -394,7 +395,7 @@ class MutationValidator:
                 uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
                 for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
                     print(chrom, ref_pos, A, int(corrected_Q), uncorrected_Q, base_type, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
-
+                    
     def call_mutations_no_filter(self, chrom, start, stop, mapq=50, mapq_hifi=40, prefix=""):
         pileup = self.bam_file.pileup(
             contig=chrom,
@@ -463,9 +464,9 @@ class BaseAdjuster:
         bam_file,
         twobit_file,
         kmer_papa,
-        output_bam
+        output_bam,
+        adjustment_file,
     ):
-
         # Open files for reading
         self.bam_file = open_bam_w_index(bam_file)
 
@@ -476,6 +477,8 @@ class BaseAdjuster:
 
         #assumes that the kmer papa has been turned into phred scaled correction factor
         self.correction_factor = kmer_papa
+
+        self.adjustment_file = adjustment_file
                 
 
     def __del__(self):
@@ -498,9 +501,13 @@ class BaseAdjuster:
         # Fill dict with changes:
         for pileupcolumn in pileup:
             ref_pos = pileupcolumn.reference_pos
-            chrom = pileupcolumn.reference_name            
+            pileup_chrom = pileupcolumn.reference_name            
 
-            kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
+            try:
+                kmer = self.tb.sequence(prefix + pileup_chrom, ref_pos- radius, ref_pos + radius + 1)
+            except:
+                continue
+            
             ref = kmer[radius]
             if 'N' in kmer or len(kmer)!= 2*radius +1:
                 continue            
@@ -517,10 +524,12 @@ class BaseAdjuster:
             
             get_adjustments(pileupcolumn, ref, papa_ref, kmer, self.correction_factor, change_dict)
 
+        print('n_reads_w_changes:', len(change_dict), file=sys.stderr)
         n_corrected_reads = 0
         n_uncorrected_reads = 0
         n_corrections = 0
         n_filtered = 0
+
         for read in self.bam_file.fetch(chrom, start, stop):
             if read.is_secondary or read.is_supplementary:
                 n_filtered += 1
@@ -529,17 +538,15 @@ class BaseAdjuster:
             if read_id in change_dict:
                 n_corrected_reads += 1
                 for pos, basequal, allele, adjusted_basequal, atype in change_dict[read_id]:
+                    if not self.adjustment_file is None:
+                        refpos = read.get_reference_positions(full_length=True)[pos]
+                        print(read.reference_name, refpos, allele, basequal, adjusted_basequal, file = self.adjustment_file)
                     n_corrections += 1
                     assert(read.query_sequence[pos] == allele)
                     assert(read.query_qualities[pos] == basequal)
                     read.query_qualities[pos] = adjusted_basequal
             else:
                 n_uncorrected_reads += 1
-
             self.out_file.write(read)
         return n_corrections, n_corrected_reads, n_uncorrected_reads, n_filtered
 
-
-
-
-            
