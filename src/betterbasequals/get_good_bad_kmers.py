@@ -80,6 +80,8 @@ class MutationFinderWFilter:
             eprint(f"{chrom}:{ref_pos}")            
         #if not self.bed_query_func(chrom, ref_pos):
         #    continue
+        if ref_pos-radius < 0:
+            return 
         kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
         if 'N' in kmer:
             return
