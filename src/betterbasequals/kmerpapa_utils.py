@@ -40,6 +40,7 @@ def get_greedy_kmerpapa(super_pattern, contextD, opts):
         D[pat] = -10*log10(p)
     return D
 
+
 def get_optimal_kmerpapa(super_pattern, contextD, opts):
     pseudo_counts = [1,2,5,10,20,30,50,100,500,1000]
     penalty_values = range(1,15)

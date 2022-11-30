@@ -91,6 +91,7 @@ def get_parser():
     call_parent.add_argument('--outfile', type=str,
         help="output file")
 
+
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
         help =  'Count good and bad k-mers',
@@ -140,7 +141,17 @@ def get_parser():
         description = 'Call variants',
         help = 'Call variants',
         parents=[call_parent])
-
+    
+    test_kmerpapa_parser = subparsers.add_parser('test_kmerpapa', 
+        description = 'Apply a kmerpapa model to a set of kmer counts',
+        help = 'Apply a kmerpapa model to a set of kmer counts')
+    test_kmerpapa_parser.add_argument("--input_file_good", type=argparse.FileType('r'))
+    test_kmerpapa_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
+    test_kmerpapa_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
+    test_kmerpapa_parser.add_argument('--correction_type', type=str, default = "bad_vs_no",
+        help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
+        choices=["bad_vs_good", "bad_vs_no"])
+    test_kmerpapa_parser.add_argument('--same_good', action='store_true')
     return parser
 
 
@@ -242,6 +253,37 @@ def run_adjust(opts, kmer_papas):
         eprint(f'{n_uncorrected_reads} reads were written with no corrections')
         eprint(f'{n_filtered} reads were filtered')
 
+def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
+    for bqual in kmer_papas:
+        for mtype in kmer_papas[bqual]:
+            if mtype[0] == mtype[-1]:
+                continue
+            eprint(f'Handling base_qual: {bqual}, mutation type: {mtype}')
+            for pat in kmer_papas[bqual][mtype]:
+                if opts.correction_type == "bad_vs_good":
+                    n_bad = sum(bad_kmers[bqual][mtype][x] for x in matches(pat))
+                    if opts.same_good:
+                        n_good = sum(good_kmers[37][mtype][x] for x in matches(pat))
+                    else:
+                        n_good = sum(good_kmers[bqual][mtype][x] for x in matches(pat))
+                elif opts.correction_type == "bad_vs_no":
+                    ref = mtype[0]
+                    alt = mtype[-1]
+                    notype = f'{ref}->{ref}'
+                    other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
+                    assert not opts.same_good, '--same_good is not presently compatible with --correction_type bad_vs_no'
+                    n_bad = sum(bad_kmers[bqual][mtype][x] for x in matches(pat))
+                    if opts.same_good:
+                        n_good = sum(good_kmers[37][notype][x] for x in matches(pat))
+                    else:
+                        n_good = sum(good_kmers[bqual][notype][x] + bad_kmers[bqual][other_type1][x] + bad_kmers[bqual][other_type2][x] for x in matches(pat))
+
+                if n_bad > 0:
+                    phred = -10*log10(n_bad / (n_bad + n_good))
+                else:
+                    phred = 0
+                print(bqual, mtype, pat, kmer_papas[bqual][mtype][pat], n_bad, n_good, phred)
+
 
 def main(args = None):
     """
@@ -265,16 +307,18 @@ def main(args = None):
         parser.print_help(sys.stderr)
         return 1
 
-    if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only']:
+    if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
         good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
-    elif opts.command == 'train_only':
+    elif opts.command in ['train_only', 'test_kmerpapa']:
         good_kmers, bad_kmers = read_kmers(opts)
 
     if opts.command == 'count':
         return 0
 
-    if not opts.command in ['validate_only', 'call_only', 'adjust_only']:
+    if not opts.command in ['validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
         kmer_papas = run_get_kmerpapas(opts, good_kmers, bad_kmers)
+    elif opts.command in "test_kmerpapa":
+        kmer_papas = read_kmer_papas_for_test(opts)
     else:
         eprint("Reading kmer pattern partitions")
         kmer_papas = read_kmer_papas(opts)
@@ -289,6 +333,8 @@ def main(args = None):
         return 1
     elif opts.command in ['adjust', 'adjust_only']:
         run_adjust(opts, kmer_papas)
+    elif opts.command == 'test_kmerpapa':
+        run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers)
     else:
         eprint("Unknown command: {opts.command}")
         return 1

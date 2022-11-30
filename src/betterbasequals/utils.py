@@ -196,6 +196,19 @@ def read_kmer_papas(opts):
             kmer_papas[bqual][mtype][context] = float(correction_factor)
     return kmer_papas
 
+def read_kmer_papas_for_test(opts):
+    kmer_papas = {}
+    for line in opts.input_file_kmerpapa:
+        bqual, mtype, pattern, correction_factor = line.split()
+        bqual=int(bqual)
+        if bqual not in kmer_papas:
+            kmer_papas[bqual] = {}
+        if mtype not in kmer_papas[bqual]:
+            kmer_papas[bqual][mtype] = {}
+        kmer_papas[bqual][mtype][pattern] = float(correction_factor)
+    return kmer_papas
+
+
 def print_kmer_papas(opts, kmer_papas):
     if not opts.output_file_kmerpapa is None:
         for bqual in kmer_papas:
