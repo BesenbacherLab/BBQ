@@ -271,7 +271,6 @@ def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
                     alt = mtype[-1]
                     notype = f'{ref}->{ref}'
                     other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
-                    assert not opts.same_good, '--same_good is not presently compatible with --correction_type bad_vs_no'
                     n_bad = sum(bad_kmers[bqual][mtype][x] for x in matches(pat))
                     if opts.same_good:
                         n_good = sum(good_kmers[37][notype][x] for x in matches(pat))
