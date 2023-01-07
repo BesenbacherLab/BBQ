@@ -466,6 +466,7 @@ class BaseAdjuster:
         kmer_papa,
         output_bam,
         adjustment_file,
+        cutoff,
     ):
         # Open files for reading
         self.bam_file = open_bam_w_index(bam_file)
@@ -479,6 +480,7 @@ class BaseAdjuster:
         self.correction_factor = kmer_papa
 
         self.adjustment_file = adjustment_file
+        self.cutoff = cutoff
                 
 
     def __del__(self):
@@ -544,7 +546,10 @@ class BaseAdjuster:
                     n_corrections += 1
                     assert(read.query_sequence[pos] == allele)
                     assert(read.query_qualities[pos] == basequal)
-                    read.query_qualities[pos] = adjusted_basequal
+                    if self.cutoff is None or adjusted_basequal >= self.cutoff:
+                        read.query_qualities[pos] = adjusted_basequal
+                    else:
+                        read.query_qualities[pos] = 0
             else:
                 n_uncorrected_reads += 1
             self.out_file.write(read)

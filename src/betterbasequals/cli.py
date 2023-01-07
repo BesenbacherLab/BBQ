@@ -85,12 +85,13 @@ def get_parser():
     adjust_parent.add_argument('--outbam', type=str,
         help="Bam file with adjusted base qualities.", required=True)
     adjust_parent.add_argument("--output_adjustments", type=argparse.FileType('w'))
+    adjust_parent.add_argument("--cutoff", type=int,
+        help="set adjusted basequalities lower than this cutoff to zero")
 
     # args for calling somatic variants:    
     call_parent = argparse.ArgumentParser(add_help=False)
     call_parent.add_argument('--outfile', type=str,
         help="output file")
-
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -243,6 +244,7 @@ def run_adjust(opts, kmer_papas):
             kmer_papas,
             opts.outbam,
             opts.output_adjustments,
+            opts.cutoff
         )
     
     n_corrections, n_corrected_reads, n_uncorrected_reads, n_filtered = \
