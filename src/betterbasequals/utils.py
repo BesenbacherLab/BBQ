@@ -108,36 +108,55 @@ class ReadPair:
         self.has_clip = 1 if (read1.has_clip or read2.has_clip) else 0
 
 
-# def zip_pileups(p1, p2, p3):
-#     while True:
-#         try:
-#             pileupcolumn1 = next(p1)
-#             pileupcolumn2 = next(p2)
-#             pileupcolumn3 = next(p3)
-#             while(pileupcolumn1.reference_pos < max(pileupcolumn2.reference_pos, pileupcolumn3.reference_pos)):
-#                 pileupcolumn1 = next(p1)
-#             while(pileupcolumn2.reference_pos < max(pileupcolumn1.reference_pos, pileupcolumn3.reference_pos)):
-#                 pileupcolumn2 = next(p2)
-#             while(pileupcolumn3.reference_pos < max(pileupcolumn1.reference_pos, pileupcolumn2.reference_pos)):
-#                 pileupcolumn3 = next(p3)
-#             if pileupcolumn1.reference_pos == pileupcolumn2.reference_pos == pileupcolumn3.reference_pos:
-#                 yield (pileupcolumn1, pileupcolumn2, pileupcolumn3)
-#         except StopIteration:
-#             break
 
-#TODO: Check that this new general function match the commented one above
 def zip_pileups(*pileups):
+    """Iterate throug a number of pilup objects and get the columns that are in all.
+    Assumes chromosomes are sorted lexicographically in all files
+    Yields:
+        list : list of pileup columns objects with identical reference pos.
+    """
+    pileupcolumns = [None] * len(pileups)
+    max_chrom = "0"
     while True:
         try:
-            pileupcolumns = [None] * len(pileups)
             for i in range(len(pileups)):
                 pileupcolumns[i]  = next(pileups[i])
-            for i in range(len(pileups)):
+            while True:
+                chrom = max(x.reference_name for x in pileupcolumns)
+                assert chrom >= max_chrom, "chromosomes should be sorted lexicographically."
+                max_chrom = chrom
                 max_pos = max(x.reference_pos for x in pileupcolumns)
-                while pileupcolumns[i].reference_pos < max_pos:
-                    pileupcolumns[i] = next(pileups[i])
-            if all(x.reference_pos == pileupcolumns[0].reference_pos for x in pileupcolumns):
-                yield pileupcolumns
+                for i in range(len(pileups)):
+                    while pileupcolumns[i].reference_name < max_chrom:
+                        pileupcolumns[i] = next(pileups[i])
+                for i in range(len(pileups)):
+                    while pileupcolumns[i].reference_name == max_chrom and pileupcolumns[i].reference_pos < max_pos:
+                        pileupcolumns[i] = next(pileups[i])
+                if all(x.reference_pos == pileupcolumns[0].reference_pos and x.reference_name == pileupcolumns[0].reference_name for x in pileupcolumns):
+                    yield pileupcolumns
+                    break
+        except StopIteration:
+            break
+
+def zip_pileups_single_chrom(*pileups):
+    """Iterate throug a number of pilup objects and get the columns that are in all.
+    Assumes that all pilups are on same chromosome. 
+    Yields:
+        list : list of pileup columns objects with identical reference pos.
+    """
+    pileupcolumns = [None] * len(pileups)
+    while True:
+        try:
+            for i in range(len(pileups)):
+                pileupcolumns[i]  = next(pileups[i])
+            while True:
+                max_pos = max(x.reference_pos for x in pileupcolumns)
+                for i in range(len(pileups)):
+                    while pileupcolumns[i].reference_pos < max_pos:
+                        pileupcolumns[i] = next(pileups[i])
+                if all(x.reference_pos == pileupcolumns[0].reference_pos for x in pileupcolumns):
+                    yield pileupcolumns
+                    break
         except StopIteration:
             break
 
