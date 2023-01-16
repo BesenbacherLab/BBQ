@@ -5,7 +5,7 @@ from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers_w_filter
 from betterbasequals.call_mutations import MutationValidator, BaseAdjuster, MutationCaller
 from betterbasequals.utils import *
 from betterbasequals import __version__
-from betterbasequals.kmerpapa_utils import *
+from betterbasequals.kmerpapa_utils import get_kmerpapa
 
 # TODO: Possible input basequalities are hardcoded. Should make flexible solution.
 VALID_BASEQUALS = [11,25,37]
@@ -75,6 +75,12 @@ def get_parser():
     train_parent.add_argument('--seed', type=int,
         help='seed for numpy.random')
     train_parent.add_argument('--same_good', action='store_true')
+    train_parent.add_argument(
+        '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10],
+        help='Different pseudo count (alpha) values to test using cross validation')
+    train_parent.add_argument(
+        '-c', '--penalty_values', type=float, metavar='c', nargs='+', default = [5,10,15,20],
+        help='Different penalty values to test using cross validation.')
 
     # args for validating models:    
     validate_parent = argparse.ArgumentParser(add_help=False)
@@ -204,10 +210,7 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
                     contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][notype][x])) for x in matches(super_pattern))
                 else:
                     contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][notype][x] + bad_kmers[bqual][other_type1][x] + bad_kmers[bqual][other_type2][x])) for x in matches(super_pattern))
-            if opts.kmerpapa_method == 'greedy':
-                kpp = get_greedy_kmerpapa(super_pattern, contextD, opts)
-            elif opts.kmerpapa_method == 'optimal':
-                kpp = get_optimal_kmerpapa(super_pattern, contextD, opts)
+            kpp = get_kmerpapa(super_pattern, contextD, opts)
             kmer_papas[bqual][mtype] = {}
             for pat in kpp:
                 if not opts.output_file_kmerpapa is None:
