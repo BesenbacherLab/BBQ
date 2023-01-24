@@ -34,8 +34,15 @@ class MutationFinderWFilter:
         self.tb.close()
 
     def find_mutations(self, chrom, start, stop, mapq=50, min_base_qual=1, filter_mapq=20, min_base_qual_filter=20, min_depth=1, max_depth=5000, radius=3, prefix="",max_bad_alt=4):
-        good_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
-        bad_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
+        #if self.base_quals is None:
+        #    good_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
+        #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
+        #else:
+        #    good_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
+        #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
+        good_kmers = Counter()
+        bad_kmers = Counter()
+
         pileup = self.bam_file.pileup(
             contig=chrom,
             start=start,
@@ -149,10 +156,12 @@ class MutationFinderWFilter:
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
             if event_type == 'good':
-                good_kmers[base_qual][mut_type][kmer] += 1
+                good_kmers[(base_qual, mut_type, kmer)] +=1
+                #good_kmers[base_qual][mut_type][kmer] += 1
             elif event_type == 'bad':
                 if allele not in has_good and n_allele[allele] < max_bad_alt:
-                    bad_kmers[base_qual][mut_type][kmer] += 1
+                    bad_kmers[(base_qual, mut_type, kmer)] += 1
+                    #bad_kmers[base_qual][mut_type][kmer] += 1
 
 def get_good_and_bad_kmers_w_filter(bam_file, twobit_file, filter_bam_file, basequals, chrom, start, end, min_depth, max_depth, radius):
     finder = MutationFinderWFilter(bam_file, twobit_file, filter_bam_file, basequals)

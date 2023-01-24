@@ -237,20 +237,32 @@ def print_kmer_papas(opts, kmer_papas):
                     print(bqual, mtype, pat, Q, file=opts.output_file_kmerpapa)
         opts.output_file_kmerpapa.close()
 
+# def print_good_and_bad(opts, good_kmers, bad_kmers):
+#     if not opts.output_file_good is None:
+#         for bqual in good_kmers:
+#             for mtype in mtypes:
+#                 super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
+#                 for kmer in matches(super_pattern):
+#                     print(bqual, mtype, kmer, good_kmers[bqual][mtype][kmer] , file = opts.output_file_good)
+#         opts.output_file_good.close()
+#     if not opts.output_file_bad is None:
+#         for bqual in bad_kmers:
+#             for mtype in mtypes:
+#                 super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
+#                 for kmer in matches(super_pattern):
+#                     print(bqual, mtype, kmer, bad_kmers[bqual][mtype][kmer], file = opts.output_file_bad)
+#         opts.output_file_bad.close()
+
 def print_good_and_bad(opts, good_kmers, bad_kmers):
     if not opts.output_file_good is None:
-        for bqual in good_kmers:
-            for mtype in mtypes:
-                super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
-                for kmer in matches(super_pattern):
-                    print(bqual, mtype, kmer, good_kmers[bqual][mtype][kmer] , file = opts.output_file_good)
+        for tup, count in good_kmers.items():
+            bqual, mtype, kmer = tup
+            print(bqual, mtype, kmer, count , file = opts.output_file_good)
         opts.output_file_good.close()
     if not opts.output_file_bad is None:
-        for bqual in bad_kmers:
-            for mtype in mtypes:
-                super_pattern = 'N'*opts.radius + mtype[0] + 'N'*opts.radius
-                for kmer in matches(super_pattern):
-                    print(bqual, mtype, kmer, bad_kmers[bqual][mtype][kmer], file = opts.output_file_bad)
+        for tup, count in bad_kmers.items():
+            bqual, mtype, kmer = tup
+            print(bqual, mtype, kmer, count , file = opts.output_file_bad)
         opts.output_file_bad.close()
 
 def parse_opts_region(opts):
