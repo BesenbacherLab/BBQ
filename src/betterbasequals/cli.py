@@ -181,7 +181,26 @@ def run_get_good_and_bad_w_filter(opts):
     good_kmers, bad_kmers = \
         counter.count_mutations(opts.chrom, opts.start, opts.end)
     print_good_and_bad(opts, good_kmers, bad_kmers)
-    return good_kmers, bad_kmers
+    
+    #change format of dicts to nested dicts
+    BQs_good = set(x[0] for x in good_kmers)
+    BQs_bad = set(x[0] for x in bad_kmers)
+    good_kmers2 = {}
+    bad_kmers2 = {}
+    for BQ in BQs_good + BQs_bad:
+        good_kmers2[BQ] = {}
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
+            good_kmers2[BQ] = defaultdict(int)
+        bad_kmers2[BQ] = {}
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+            bad_kmers2[BQ] = defaultdict(int)
+    for tup, count in good_kmers.items():
+        BQ, mtype, kmer = tup
+        good_kmers2[BQ][mtype][kmer] = count
+    for tup, count in bad_kmers.items():
+        BQ, mtype, kmer = tup
+        bad_kmers2[BQ][mtype][kmer] = count
+    return good_kmers2, bad_kmers2
 
 
 def run_get_kmerpapas(opts, good_kmers, bad_kmers):
