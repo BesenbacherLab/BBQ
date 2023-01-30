@@ -1,8 +1,10 @@
 import csv
 import sys
-from itertools import product, count
-from operator import add
-from functools import reduce, partial
+#from itertools import product, count
+#from operator import add
+#from functools import reduce, partial
+from collections import defaultdict
+from math import log10
 import pysam
 import os
 
@@ -15,37 +17,43 @@ complement = str.maketrans("ATCGN", "TAGCN")
 def reverse_complement(s):
     return s.translate(complement)[::-1]
 
-def regions(bed_file):
-    with open(bed_file) as fp:
-        reader = csv.reader(fp, delimiter="\t")
-        for line in reader:
-            yield line[0], int(line[1]), int(line[2])
+def p2phred(p):
+    return -10*log10(p)
 
-def regions_if_sorted(bed_file):
-    with open(bed_file) as fp:
-        reader = csv.reader(fp, delimiter="\t")
-        for line in reader:
-            yield line[0], int(line[1]), int(line[2])
+def phred2p(Q):
+    return 10**(-Q/10)
 
-def generate_mutation_types(k):
-    if k % 2 == 0:
-        raise ValueError("k must be uneven")
-    types = list()
-    mut_pos = (k - 1) // 2
-    for mer in map(
-        partial(reduce, add),
-        product(*(["ATGC"] * mut_pos + ["TC"] + ["ATGC"] * mut_pos)),
-    ):
-        alts = "ATG"
-        if mer[mut_pos] == "T":
-            alts = "AGC"
-        for alt in alts:
-            after = mer[:mut_pos] + alt + mer[mut_pos + 1 :]
-            mut = ">".join([mer[mut_pos],alt])
-            types.append("_".join([mut, mer]))
-    return sorted(types)
+# def regions(bed_file):
+#     with open(bed_file) as fp:
+#         reader = csv.reader(fp, delimiter="\t")
+#         for line in reader:
+#             yield line[0], int(line[1]), int(line[2])
 
-mutation_types_3_mer = dict(zip(generate_mutation_types(3), count()))
+# def regions_if_sorted(bed_file):
+#     with open(bed_file) as fp:
+#         reader = csv.reader(fp, delimiter="\t")
+#         for line in reader:
+#             yield line[0], int(line[1]), int(line[2])
+
+# def generate_mutation_types(k):
+#     if k % 2 == 0:
+#         raise ValueError("k must be uneven")
+#     types = list()
+#     mut_pos = (k - 1) // 2
+#     for mer in map(
+#         partial(reduce, add),
+#         product(*(["ATGC"] * mut_pos + ["TC"] + ["ATGC"] * mut_pos)),
+#     ):
+#         alts = "ATG"
+#         if mer[mut_pos] == "T":
+#             alts = "AGC"
+#         for alt in alts:
+#             after = mer[:mut_pos] + alt + mer[mut_pos + 1 :]
+#             mut = ">".join([mer[mut_pos],alt])
+#             types.append("_".join([mut, mer]))
+#     return sorted(types)
+
+# mutation_types_3_mer = dict(zip(generate_mutation_types(3), count()))
 
 code = {'A':['A'],
         'C':['C'],
@@ -110,7 +118,7 @@ class ReadPair:
 
 
 def zip_pileups(*pileups):
-    """Iterate throug a number of pilup objects and get the columns that are in all.
+    """Iterate through a number of pilup objects and get the columns that are in all.
     Assumes chromosomes are sorted lexicographically in all files
     Yields:
         list : list of pileup columns objects with identical reference pos.
@@ -123,7 +131,7 @@ def zip_pileups(*pileups):
                 pileupcolumns[i]  = next(pileups[i])
             while True:
                 chrom = max(x.reference_name for x in pileupcolumns)
-                assert chrom >= max_chrom, "chromosomes should be sorted lexicographically."
+                assert chrom >= max_chrom, f"chromosomes should be sorted lexicographically, prev:{max_chrom}, current:{chrom}"
                 max_chrom = chrom
                 max_pos = max(x.reference_pos for x in pileupcolumns)
                 for i in range(len(pileups)):
@@ -188,7 +196,7 @@ def read_kmers(opts):
         if bqual not in good_kmers:
             good_kmers[bqual] = {}
         if mtype not in good_kmers[bqual]:
-            good_kmers[bqual][mtype] = {}
+            good_kmers[bqual][mtype] = defaultdict(int)
         good_kmers[bqual][mtype][kmer] = int(count)
 
     bad_kmers = {}
@@ -198,7 +206,7 @@ def read_kmers(opts):
         if bqual not in bad_kmers:
             bad_kmers[bqual] = {}
         if mtype not in bad_kmers[bqual]:
-            bad_kmers[bqual][mtype] = {}
+            bad_kmers[bqual][mtype] = defaultdict(int)
         bad_kmers[bqual][mtype][kmer] = int(count)
     return good_kmers, bad_kmers
 

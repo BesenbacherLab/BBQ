@@ -1,4 +1,3 @@
-from asyncio import events
 import pysam
 import py2bit
 import os
@@ -13,13 +12,21 @@ def get_mut_type(ref, alt):
     return mtype
 
 
-class MutationFinderWFilter:
+class MutationCounterWFilter:
     def __init__(
         self,
         bam_file,
         twobit_file,
         filter_bam_file,
-        basequals = [11,25,37]
+        mapq = 50,
+        min_base_qual = 1,
+        filter_mapq = 20,
+        min_base_qual_filter=20, 
+        min_depth=1, 
+        max_depth=5000, 
+        radius=3, 
+        prefix="", 
+        max_bad_alt=4
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
@@ -28,12 +35,21 @@ class MutationFinderWFilter:
         else:
             self.filter_bam_file = open_bam_w_index(filter_bam_file)
         self.tb = py2bit.open(twobit_file)
-        self.base_quals = basequals
+   
+        self.mapq = mapq
+        self.min_base_qual = min_base_qual
+        self.filter_mapq = filter_mapq
+        self.min_base_qual_filter = min_base_qual_filter
+        self.min_depth = min_depth
+        self.max_depth = max_depth
+        self.radius = radius
+        self.prefix = prefix
+        self.max_bad_alt = max_bad_alt
 
     def __del__(self):
         self.tb.close()
 
-    def find_mutations(self, chrom, start, stop, mapq=50, min_base_qual=1, filter_mapq=20, min_base_qual_filter=20, min_depth=1, max_depth=5000, radius=3, prefix="",max_bad_alt=4):
+    def count_mutations(self, chrom, start, stop):
         #if self.base_quals is None:
         #    good_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
         #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
@@ -44,27 +60,27 @@ class MutationFinderWFilter:
         bad_kmers = Counter()
 
         pileup = self.bam_file.pileup(
-            contig=chrom,
-            start=start,
-            stop=stop,
-            truncate=True,
-            min_mapping_quality=mapq,
-            ignore_overlaps=False,
-            flag_require=2,  # proper paired
-            flag_filter=3848,
-            min_base_quality = min_base_qual,
+            contig = chrom,
+            start = start,
+            stop = stop,
+            truncate = True,
+            min_mapping_quality = self.mapq,
+            ignore_overlaps = False,
+            flag_require = 2,  # proper paired
+            flag_filter = 3848,
+            min_base_quality = self.min_base_qual,
         )
         if not self.filter_bam_file is None:
             filter_pileup = self.filter_bam_file.pileup(
-                contig=chrom,
-                start=start,
-                stop=stop,
-                truncate=True,
-                min_mapping_quality=filter_mapq,
-                ignore_overlaps=False,
-                flag_require=2,  # proper paired
-                flag_filter=3848,
-                min_base_quality = min_base_qual_filter,
+                contig = chrom,
+                start = start,
+                stop = stop,
+                truncate = True,
+                min_mapping_quality = self.filter_mapq,
+                ignore_overlaps = False,
+                flag_require = 2,  # proper paired
+                flag_filter = 3848,
+                min_base_quality = self.min_base_qual_filter,
             )
             for pileupcolumn, filter_pc in zip_pileups(pileup, filter_pileup):
                 N_filter = 0
@@ -73,32 +89,32 @@ class MutationFinderWFilter:
                 #TODO: replace hardcoded numbers with values relative to mean coverage
                 if N_filter < 25 or N_filter > 55:
                     continue
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius, max_bad_alt)
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers)
         else:
             for pileupcolumn in pileup:
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius, max_bad_alt)
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers)
         
         return good_kmers, bad_kmers
 
-    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, prefix, min_depth, max_depth, radius, max_bad_alt):
+    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
             eprint(f"{chrom}:{ref_pos}")            
         #if not self.bed_query_func(chrom, ref_pos):
         #    continue
-        if ref_pos-radius < 0:
+        if ref_pos-self.radius < 0:
             return 
-        kmer = self.tb.sequence(prefix + chrom, ref_pos- radius, ref_pos + radius + 1)
+        kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
             return
-        ref = kmer[radius]
+        ref = kmer[self.radius]
         if ref not in "ATGC":
             return
         if ref not in ['A', 'C']:
             kmer = reverse_complement(kmer)
 
-        reads_mem = dict()
+        reads_mem = {}
         event_list = []
         coverage = 0
 
@@ -151,19 +167,14 @@ class MutationFinderWFilter:
                         event_list.append(('bad', mem_read.allel, mem_read.base_qual))
             else:            
                 reads_mem[read.query_name] = read
-        if coverage < min_depth or coverage > max_depth:
+        if coverage < self.min_depth or coverage > self.max_depth:
             return
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
             if event_type == 'good':
-                good_kmers[(base_qual, mut_type, kmer)] +=1
+                good_kmers[(base_qual, mut_type, kmer)] += 1
                 #good_kmers[base_qual][mut_type][kmer] += 1
             elif event_type == 'bad':
-                if allele not in has_good and n_allele[allele] < max_bad_alt:
+                if allele not in has_good and n_allele[allele] < self.max_bad_alt:
                     bad_kmers[(base_qual, mut_type, kmer)] += 1
                     #bad_kmers[base_qual][mut_type][kmer] += 1
-
-def get_good_and_bad_kmers_w_filter(bam_file, twobit_file, filter_bam_file, basequals, chrom, start, end, min_depth, max_depth, radius):
-    finder = MutationFinderWFilter(bam_file, twobit_file, filter_bam_file, basequals)
-    good_kmers, bad_kmers = finder.find_mutations(chrom, start, end, min_depth=min_depth, max_depth=max_depth, radius=radius)
-    return good_kmers, bad_kmers

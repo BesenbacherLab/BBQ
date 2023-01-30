@@ -1,14 +1,16 @@
 """Module that contains the command line application."""
 
 import argparse
-from betterbasequals.get_good_bad_kmers import get_good_and_bad_kmers_w_filter
-from betterbasequals.call_mutations import MutationValidator, BaseAdjuster, MutationCaller
+from betterbasequals.get_good_bad_kmers import MutationCounterWFilter
+from betterbasequals.model_validators import MutationValidator
+from betterbasequals.bam_adjusters import BaseAdjuster
+from betterbasequals.somatic_callers import SomaticMutationCaller
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from betterbasequals.kmerpapa_utils import get_kmerpapa
 
 # TODO: Possible input basequalities are hardcoded. Should make flexible solution.
-VALID_BASEQUALS = [11,25,37]
+#VALID_BASEQUALS = [11,25,37]
 
 def get_parser():
     """
@@ -98,6 +100,11 @@ def get_parser():
     call_parent = argparse.ArgumentParser(add_help=False)
     call_parent.add_argument('--outfile', type=str,
         help="output file")
+    call_parent.add_argument('--method', type=str,
+        choices=['LR', "poisson", 'BF'], default="LR",
+        help="Method used to calculate variant quality scores")
+    call_parent.add_argument('--cutoff', type=float, default=0.05,
+        help="initial variant calling p-value cutoff")
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -147,7 +154,8 @@ def get_parser():
     call_only_parser = subparsers.add_parser('call_only', 
         description = 'Call variants',
         help = 'Call variants',
-        parents=[call_parent])
+        parents=[bam_parent, filter_parent, call_parent])
+    call_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
     
     test_kmerpapa_parser = subparsers.add_parser('test_kmerpapa', 
         description = 'Apply a kmerpapa model to a set of kmer counts',
@@ -165,18 +173,13 @@ def get_parser():
 def run_get_good_and_bad_w_filter(opts):
     if opts.verbosity > 0:
         eprint("Counting good and bad kmers")
-    good_kmers, bad_kmers = get_good_and_bad_kmers_w_filter(
-        opts.bam_file,
-        opts.twobit_file,
-        opts.filter_bam_file,
-        VALID_BASEQUALS,
-        opts.chrom,
-        opts.start,
-        opts.end,
-        opts.min_depth,
-        opts.max_depth,
-        opts.radius,
-    )
+    counter = \
+        MutationCounterWFilter(
+            opts.bam_file, 
+            opts.twobit_file, 
+            opts.filter_bam_file)
+    good_kmers, bad_kmers = \
+        counter.count_mutations(opts.chrom, opts.start, opts.end)
     print_good_and_bad(opts, good_kmers, bad_kmers)
     return good_kmers, bad_kmers
 
@@ -258,6 +261,29 @@ def run_adjust(opts, kmer_papas):
         eprint(f'{n_uncorrected_reads} reads were written with no corrections')
         eprint(f'{n_filtered} reads were filtered')
 
+
+def run_call(opts, kmer_papas):
+    if opts.verbosity > 0:
+        eprint("Calling somatic variants")
+    caller = \
+        SomaticMutationCaller(
+            opts.bam_file,
+            opts.filter_bam_file,
+            opts.twobit_file, 
+            kmer_papas,
+            opts.method,
+            opts.cutoff,
+        )
+    
+    n_calls = \
+        caller.call_mutations(opts.chrom, opts.start, opts.end)
+
+    if opts.verbosity > 0:
+        eprint(f'Found {n_calls} variants with a p-value less than {opts.cutoff}.')
+    
+
+
+
 def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
     for bqual in kmer_papas:
         for mtype in kmer_papas[bqual]:
@@ -333,8 +359,7 @@ def main(args = None):
     if opts.command in ['validate', 'validate_only']:
         run_validation(opts, kmer_papas)
     elif opts.command in ['call', 'call_only']:
-        eprint("Call not implemented yet")
-        return 1
+        run_call(opts, kmer_papas)
     elif opts.command in ['adjust', 'adjust_only']:
         run_adjust(opts, kmer_papas)
     elif opts.command == 'test_kmerpapa':
