@@ -13,15 +13,27 @@ def get_LR(base_probs):
     # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
     def p_data_given_mut(alpha):
         return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
+        
+        #Maybe we can weigh the read prob using the mapping quality
+        #return sum(p2phred((1-p_map_error)*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) +p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
 
     res = minimize_scalar(p_data_given_mut, bounds=(0, 1), method='bounded')
     # Alternative:
     # Integrate out alpha (maybe I should call the getBF (Bayes Factor) instead of getLR then)
-    # LL, error = cipy.integrate.quad(p_data_given_mut, 0, 1)
+    # LL, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
     # Bør nok have prior fordeling på alpha så.
-    eprint(res.x)
-    return res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs)
+    N = len(base_probs)
+    N_A = sum(1 for x,y in base_probs if x<y)
+    alpha = res.x
 
+    #if N_A > 1:
+    #    print(base_probs)
+    #    print([p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs])
+    #    eprint(f'alpha={res.x} N={N} N_A={N_A}')
+    #    print(res.fun, sum(p_r2x for p_a2x, p_r2x in base_probs),  res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs))
+    #LR = res.fun - sum(p2phred((1-p_map_error)*phred2p(p_r2x)+p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
+    LR = res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs)
+    return LR, N, N_A, alpha
 
 
 class SomaticMutationCaller:
@@ -31,6 +43,7 @@ class SomaticMutationCaller:
         filter_bam_file,
         twobit_file,
         kmer_papa,
+        outfile,
         method,
         cutoff,
         mapq = 50,
@@ -52,19 +65,21 @@ class SomaticMutationCaller:
         # assumes that the kmer papa has been turned into phred scaled probabilities
         self.mut_probs = kmer_papa
 
+        self.outfile = outfile
         self.method = method
 
         if self.method == 'LR':
             # make sure that all X->X are also in kmerpapa
             mtype_tups = ('C->C', ('C->A', 'C->G', 'C->T')), ('A->A', ('A->C', 'A->G', 'A->T'))
-            for stay_type, change_types in mtype_tups:
-                self.mut_probs[stay_type] = {}
-                for kmer in self.mut_probs[change_types[0]]:
-                    p = 1.0
-                    for change_type in change_types:
-                        #TODO: should we use log-sum-exp function for numerical stability?
-                        p -= phred2p(self.mut_probs[change_type][kmer])
-                    self.mut_probs[stay_type][kmer] = p2phred(p)
+            for BQ in self.mut_probs:
+                for stay_type, change_types in mtype_tups:
+                    self.mut_probs[BQ][stay_type] = {}
+                    for kmer in self.mut_probs[BQ][change_types[0]]:
+                        p = 1.0
+                        for change_type in change_types:
+                            #TODO: should we use log-sum-exp function for numerical stability?
+                            p -= phred2p(self.mut_probs[BQ][change_type][kmer])
+                        self.mut_probs[BQ][stay_type][kmer] = p2phred(p)
 
         self.cutoff = cutoff
         self.mapq = mapq
@@ -102,6 +117,7 @@ class SomaticMutationCaller:
             flag_filter = 3848,
             min_base_quality = self.min_base_qual,
         )
+        n_calls = 0
         if not self.filter_bam_file is None:
             filter_pileup = self.filter_bam_file.pileup(
                 contig = chrom,
@@ -119,17 +135,19 @@ class SomaticMutationCaller:
                 filter_alleles = set()
                 for pread in filter_pc.pileups:
                     pos = pread.query_position
-                    filter_alleles.add(pread.alignment.query_sequence[pos])
+                    if not pos is None:
+                        filter_alleles.add(pread.alignment.query_sequence[pos])
                     N_filter += 1
 
                 # TODO: Replace hardcoded values
                 if N_filter < 25 or N_filter > 55:
                     continue
 
-                self.handle_pileup(pileupcolumn, filter_alleles)
+                n_calls += self.handle_pileup(pileupcolumn, filter_alleles)
         else:
             for pileupcolumn in pileup:
-                self.handle_pileup(pileupcolumn, [])
+                n_calls += self.handle_pileup(pileupcolumn, [])
+        return n_calls
 
 
     def handle_pileup(self, pileupcolumn, filter_alleles):
@@ -152,6 +170,18 @@ class SomaticMutationCaller:
             return
 
         if self.method == 'poisson':
+            base_probs, seen_alts = get_alleles_w_probabities(pileupcolumn, ref, kmer, self.mut_probs)
+            #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
+            for A in seen_alts:
+                if A in filter_alleles:
+                    continue
+                LR, N, N_A, AF = get_LR(base_probs[A])
+                # make LR into p-value
+                p_val = scipy.stats.chi2.sf(-2*LR, 2)
+                #print(f'pval=={p_val}')
+                if p_val < self.cutoff:
+                    print(f'{chrom}\t{ref_pos}\t{ref}\t{A}\tpval={p_val};LR={LR};AF={AF};N={N};N_A={N_A}', file=self.outfile)
+
             raise NotImplementedError
             #make new pileup handler
         elif self.method == 'sum':
@@ -163,11 +193,12 @@ class SomaticMutationCaller:
             for A in seen_alts:
                 if A in filter_alleles:
                     continue
-                LR = get_LR(base_probs[A])
+                LR, N, N_A, AF = get_LR(base_probs[A])
                 # make LR into p-value
-                p_val = scipy.stats.chi2.sf(2*LR, 2)
+                p_val = scipy.stats.chi2.sf(-2*LR, 2)
                 if p_val < self.cutoff:
-                    print(f'{chrom}\t{ref_pos}\t{ref}\t{A}\t{p_val}\t{LR}', file=self.outfile)
+                    n_calls += 1
+                    print(f'{chrom}\t{ref_pos}\t{ref}\t{A}\tpval={p_val};LR={LR};AF={AF};N={N};N_A={N_A}', file=self.outfile)
 
-        return 0
+        return n_calls
 

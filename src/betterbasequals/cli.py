@@ -98,12 +98,12 @@ def get_parser():
 
     # args for calling somatic variants:    
     call_parent = argparse.ArgumentParser(add_help=False)
-    call_parent.add_argument('--outfile', type=str,
+    call_parent.add_argument('--outfile', type=argparse.FileType('w'), default=sys.stdout,
         help="output file")
     call_parent.add_argument('--method', type=str,
         choices=['LR', "poisson", 'BF'], default="LR",
         help="Method used to calculate variant quality scores")
-    call_parent.add_argument('--cutoff', type=float, default=0.05,
+    call_parent.add_argument('--cutoff', type=float, default=0.001,
         help="initial variant calling p-value cutoff")
 
     count_parser = subparsers.add_parser('count', 
@@ -271,6 +271,7 @@ def run_call(opts, kmer_papas):
             opts.filter_bam_file,
             opts.twobit_file, 
             kmer_papas,
+            opts.outfile,
             opts.method,
             opts.cutoff,
         )
