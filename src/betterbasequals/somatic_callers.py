@@ -198,7 +198,7 @@ class SomaticMutationCaller:
                 p_val = scipy.stats.chi2.sf(-2*LR, 2)
                 if p_val < self.cutoff:
                     n_calls += 1
-                    print(f'{chrom}\t{ref_pos}\t{ref}\t{A}\tpval={p_val};LR={LR};AF={AF};N={N};N_A={N_A}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t{ref}\t{A}\tpval={p_val};LR={LR};AF={AF};N={N};N_A={N_A}', file=self.outfile)
 
         return n_calls
 
