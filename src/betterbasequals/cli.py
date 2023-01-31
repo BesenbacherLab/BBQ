@@ -187,13 +187,13 @@ def run_get_good_and_bad_w_filter(opts):
     BQs_bad = set(x[0] for x in bad_kmers)
     good_kmers2 = {}
     bad_kmers2 = {}
-    for BQ in BQs_good + BQs_bad:
+    for BQ in BQs_good | BQs_bad:
         good_kmers2[BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
-            good_kmers2[BQ] = defaultdict(int)
+            good_kmers2[BQ][mtype] = defaultdict(int)
         bad_kmers2[BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-            bad_kmers2[BQ] = defaultdict(int)
+            bad_kmers2[BQ][mtype] = defaultdict(int)
     for tup, count in good_kmers.items():
         BQ, mtype, kmer = tup
         good_kmers2[BQ][mtype][kmer] = count
