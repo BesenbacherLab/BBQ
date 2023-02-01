@@ -23,10 +23,10 @@ class MutationCounterWFilter:
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
-        max_depth=5000, 
+        max_depth=1000000, 
         radius=3, 
         prefix="", 
-        max_bad_alt=4
+        max_bad_alt=500,
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
@@ -64,6 +64,7 @@ class MutationCounterWFilter:
             start = start,
             stop = stop,
             truncate = True,
+            max_depth = 1000000,
             min_mapping_quality = self.mapq,
             ignore_overlaps = False,
             flag_require = 2,  # proper paired

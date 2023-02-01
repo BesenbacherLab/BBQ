@@ -53,6 +53,7 @@ class MutationValidator:
             start=start,
             stop=stop,
             truncate=True,
+            max_depth = 1000000,
             min_mapping_quality=mapq,
             ignore_overlaps=False,
             flag_require=2,  # proper paired
@@ -130,6 +131,7 @@ class MutationValidator:
             start=start,
             stop=stop,
             truncate=True,
+            max_depth = 1000000,
             min_mapping_quality=mapq,
             ignore_overlaps=False,
             flag_require=2,  # proper paired

@@ -111,6 +111,7 @@ class SomaticMutationCaller:
             start = start,
             stop = stop,
             truncate = True,
+            max_depth = 1000000,
             min_mapping_quality = self.mapq,
             ignore_overlaps = False,
             flag_require = 2,  # proper paired
