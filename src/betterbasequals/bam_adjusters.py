@@ -33,6 +33,13 @@ class BaseAdjuster:
     def __del__(self):
         self.tb.close()
 
+
+    def call_all_chroms(self):
+        for idx_stats in self.bam_file.get_index_statistics():
+            if idx_stats.mapped > 0:
+                self.call_mutations(idx_stats.contig, None, None)
+
+
     def call_mutations(self, chrom, start, stop, mapq=50, radius=3, prefix=""):
         pileup = self.bam_file.pileup(
             contig=chrom,

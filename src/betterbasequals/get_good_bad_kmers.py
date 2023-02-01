@@ -49,6 +49,17 @@ class MutationCounterWFilter:
     def __del__(self):
         self.tb.close()
 
+    def count_mutation_all_chroms(self):
+        good_kmers = Counter()
+        bad_kmers = Counter()
+        for idx_stats in self.bam_file.get_index_statistics():
+            if idx_stats.mapped > 0:
+                good_c, bad_c = self.count_mutations(idx_stats.contig, None, None)
+                good_kmers += good_c
+                bad_kmers += bad_c
+        return good_kmers, bad_kmers
+
+
     def count_mutations(self, chrom, start, stop):
         #if self.base_quals is None:
         #    good_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}

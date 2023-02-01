@@ -178,8 +178,12 @@ def run_get_good_and_bad_w_filter(opts):
             opts.bam_file, 
             opts.twobit_file, 
             opts.filter_bam_file)
-    good_kmers, bad_kmers = \
-        counter.count_mutations(opts.chrom, opts.start, opts.end)
+    if opts.chrom is None:
+        good_kmers, bad_kmers = \
+            counter.count_mutations_all_chroms()
+    else:
+        good_kmers, bad_kmers = \
+            counter.count_mutations(opts.chrom, opts.start, opts.end)
     print_good_and_bad(opts, good_kmers, bad_kmers)
     
     #change format of dicts to nested dicts
@@ -257,7 +261,10 @@ def run_validation(opts, kmer_papas):
             opts.validation_bam_file, 
             opts.twobit_file, 
             kmer_papas)
-    validator.call_mutations(opts.chrom, opts.start, opts.end)
+    if opts.chrom is None:
+        validator.call_all_chroms()
+    else:
+        validator.call_mutations(opts.chrom, opts.start, opts.end)
 
 def run_adjust(opts, kmer_papas):
     if opts.verbosity > 0:
@@ -294,9 +301,10 @@ def run_call(opts, kmer_papas):
             opts.method,
             opts.cutoff,
         )
-    
-    n_calls = \
-        caller.call_mutations(opts.chrom, opts.start, opts.end)
+    if opts.chrom is None:
+        n_calls = caller.call_all_chroms()
+    else:
+        n_calls = caller.call_mutations(opts.chrom, opts.start, opts.end)
 
     if opts.verbosity > 0:
         eprint(f'Found {n_calls} variants with a p-value less than {opts.cutoff}.')

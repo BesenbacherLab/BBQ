@@ -23,6 +23,35 @@ def p2phred(p):
 def phred2p(Q):
     return 10**(-Q/10)
 
+def get_average_coverage(bamfile):
+    """Quickly calculates the average coverage of a WGS bamfile using the bam index.
+    OBS: Only works for bam not cram!
+
+    Args:
+        bamfile (pysam.AlignmentFile): bamfile
+
+    Returns:
+        int: average coverage over all cromosomes where at least one reads map.
+    """
+    read_len = 0
+    i = 0
+    for read in bamfile.fetch():
+        read_len = max(read_len, read.query_length)
+        i += 1
+        if i > 10:
+            break
+    n_mapped = 0
+    genome_len = 0
+    for idx_stats in bamfile.get_index_statistics():
+        print(idx_stats)
+        if idx_stats.mapped > 0:
+            n_mapped += idx_stats.mapped
+            genome_len += bamfile.get_reference_length(idx_stats.contig)
+
+    return (n_mapped * read_len)/genome_len
+
+
+
 # def regions(bed_file):
 #     with open(bed_file) as fp:
 #         reader = csv.reader(fp, delimiter="\t")

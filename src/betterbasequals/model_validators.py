@@ -1,5 +1,5 @@
 import py2bit
-from betterbasequals.utils import reverse_complement, Read, zip_pileups, open_bam_w_index
+from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, open_bam_w_index
 from betterbasequals.pilup_handlers import get_pileup_count, get_alleles_w_quals, get_alleles_w_corrected_quals
 
 
@@ -40,6 +40,10 @@ class MutationValidator:
     def __del__(self):
         self.tb.close()
 
+    def call_all_chroms(self):
+        for idx_stats in self.bam_file.get_index_statistics():
+            if idx_stats.mapped > 0:
+                self.call_mutations(idx_stats.contig, None, None)
 
     def call_mutations(self, chrom, start, stop):
         if self.filter_bam_file is None:
@@ -79,7 +83,7 @@ class MutationValidator:
             flag_filter=3848,
         )
         
-        for pileupcolumn, filter_pc, hifi_pc in zip_pileups(pileup, filter_pileup, Hifi_pileup):
+        for pileupcolumn, filter_pc, hifi_pc in zip_pileups_single_chrom(pileup, filter_pileup, Hifi_pileup):
             ref_pos = pileupcolumn.reference_pos
             chrom = pileupcolumn.reference_name            
             #if not self.bed_query_func(chrom, ref_pos):
@@ -147,7 +151,7 @@ class MutationValidator:
             flag_filter=3848,
         )
         
-        for pileupcolumn, hifi_pc in zip_pileups(pileup, Hifi_pileup):
+        for pileupcolumn, hifi_pc in zip_pileups_single_chrom(pileup, Hifi_pileup):
             ref_pos = pileupcolumn.reference_pos
             chrom = pileupcolumn.reference_name            
             #if not self.bed_query_func(chrom, ref_pos):

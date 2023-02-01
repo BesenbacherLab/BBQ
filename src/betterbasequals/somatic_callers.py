@@ -1,6 +1,6 @@
 import py2bit
 from scipy.optimize import minimize_scalar
-from betterbasequals.utils import eprint, zip_pileups, open_bam_w_index, phred2p, p2phred
+from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred
 from betterbasequals.pilup_handlers import get_alleles_w_probabities
 import scipy.stats
 
@@ -51,14 +51,17 @@ class SomaticMutationCaller:
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
-        max_depth=5000, 
+        max_depth=1000000,
         radius=3, 
         prefix="", 
     ):
 
         # Open files for reading
         self.bam_file = open_bam_w_index(bam_file)
-        self.filter_bam_file = open_bam_w_index(filter_bam_file)
+        if filter_bam_file is None:
+            self.filter_bam_file = None
+        else:
+            self.filter_bam_file = open_bam_w_index(filter_bam_file)
 
         self.tb = py2bit.open(twobit_file)
 
@@ -91,6 +94,10 @@ class SomaticMutationCaller:
         self.radius = radius
         self.prefix = prefix
 
+        #TODO: filter_depth variable should be set based on average coverage in filter file.
+        self.min_filter_depth = 10
+        self.max_filter_depth = 1000000
+
         # Create correction factor dict:
 
         # self.correction_factor = {mtype:{} for mtype in kmer_papa}
@@ -104,6 +111,15 @@ class SomaticMutationCaller:
 
     def __del__(self):
         self.tb.close()
+
+    def call_all_chroms(self):
+        n_calls = 0
+        for idx_stats in self.bam_file.get_index_statistics():
+            if idx_stats.mapped > 0:
+                print(idx_stats.contig, self.bam_file.get_reference_length(idx_stats.contig))
+                n_calls += self.call_mutations(idx_stats.contig, None, None)
+            
+        return n_calls
 
     def call_mutations(self, chrom, start, stop):
         pileup = self.bam_file.pileup(
@@ -131,7 +147,7 @@ class SomaticMutationCaller:
                 flag_filter = 3848,
                 min_base_quality = self.min_base_qual_filter,
             )
-            for pileupcolumn, filter_pc in zip_pileups(pileup, filter_pileup):
+            for pileupcolumn, filter_pc in zip_pileups_single_chrom(pileup, filter_pileup):
                 N_filter = 0
                 filter_alleles = set()
                 for pread in filter_pc.pileups:
@@ -140,8 +156,7 @@ class SomaticMutationCaller:
                         filter_alleles.add(pread.alignment.query_sequence[pos])
                     N_filter += 1
 
-                # TODO: Replace hardcoded values
-                if N_filter < 25 or N_filter > 55:
+                if N_filter < self.min_filter_depth or N_filter > self.max_filter_depth:
                     continue
 
                 n_calls += self.handle_pileup(pileupcolumn, filter_alleles)
@@ -154,7 +169,7 @@ class SomaticMutationCaller:
     def handle_pileup(self, pileupcolumn, filter_alleles):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
-        if ref_pos%10000 == 0:
+        if ref_pos%100000 == 0:
             eprint(f"{chrom}:{ref_pos}")            
         #if not self.bed_query_func(chrom, ref_pos):
         #    continue
@@ -162,13 +177,13 @@ class SomaticMutationCaller:
         n_calls = 0
 
         if ref_pos-self.radius < 0:
-            return 
+            return 0
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
-            return
+            return 0
         ref = kmer[self.radius]
         if ref not in "ATGC":
-            return
+            return 0
 
         if self.method == 'poisson':
             base_probs, seen_alts = get_alleles_w_probabities(pileupcolumn, ref, kmer, self.mut_probs)
