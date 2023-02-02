@@ -2,7 +2,7 @@ import pysam
 import py2bit
 import os
 from collections import Counter
-from betterbasequals.utils import reverse_complement, mtypes, Read, zip_pileups, eprint, open_bam_w_index
+from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, eprint, open_bam_w_index
 
 def get_mut_type(ref, alt):
     if ref in ['T', 'G']:
@@ -26,7 +26,8 @@ class MutationCounterWFilter:
         max_depth=1000000, 
         radius=3, 
         prefix="", 
-        max_bad_alt=500,
+        max_bad_frac=0.05,
+        min_filter_count = 2,
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
@@ -44,7 +45,8 @@ class MutationCounterWFilter:
         self.max_depth = max_depth
         self.radius = radius
         self.prefix = prefix
-        self.max_bad_alt = max_bad_alt
+        self.max_bad_alt = max_bad_frac
+        self.min_filter_count = min_filter_count
 
     def __del__(self):
         self.tb.close()
@@ -94,21 +96,34 @@ class MutationCounterWFilter:
                 flag_filter = 3848,
                 min_base_quality = self.min_base_qual_filter,
             )
-            for pileupcolumn, filter_pc in zip_pileups(pileup, filter_pileup):
+            for pileupcolumn, filter_pc in zip_pileups_single_chrom(pileup, filter_pileup):
                 N_filter = 0
+                n_alleles = Counter()
                 for pread in filter_pc.pileups:
+                    pos = pread.query_position
+                    if not pos is None:
+                        n_alleles.add(pread.alignment.query_sequence[pos])
                     N_filter += 1
-                #TODO: replace hardcoded numbers with values relative to mean coverage
-                if N_filter < 25 or N_filter > 55:
-                    continue
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers)
+                if N_filter < self.min_filter_depth or N_filter > self.max_filter_depth:
+                    continue                
+
+                # We can set filter so that we only considder sites where
+                # Any non-ref allele is seen min_filter_count times or more
+                if len(n_alleles) > 1:
+                    major, second = n_alleles.most_common(2)
+                    if second[1] >= self.min_filter_count:
+                        continue
+                else:
+                    major = n_alleles.most_common(1)
+
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, major[0])
         else:
             for pileupcolumn in pileup:
                 self.handle_pileup(pileupcolumn, good_kmers, bad_kmers)
         
         return good_kmers, bad_kmers
 
-    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers):
+    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, major_allele = None):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
@@ -117,10 +132,16 @@ class MutationCounterWFilter:
         #    continue
         if ref_pos-self.radius < 0:
             return 
+
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
             return
+
         ref = kmer[self.radius]
+
+        if major_allele is not None and major_allele != ref:
+            return
+
         if ref not in "ATGC":
             return
         if ref not in ['A', 'C']:
@@ -143,7 +164,6 @@ class MutationCounterWFilter:
             # fetch read information
             read = Read(pileup_read)
 
-
             # test if read is okay
             if (
                 read.allel not in "ATGC"
@@ -161,7 +181,6 @@ class MutationCounterWFilter:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
 
-                # We ignore alleles where pair doesn't match (could add else clause to handle)
                 if read.allel == mem_read.allel:
                     event_list.append(('good', read.allel, read.base_qual))
                     event_list.append(('good', read.allel, mem_read.base_qual))
@@ -181,12 +200,39 @@ class MutationCounterWFilter:
                 reads_mem[read.query_name] = read
         if coverage < self.min_depth or coverage > self.max_depth:
             return
+        N = sum(n_allele.values())
+
+        #We ignore sites where matching reference allele aren't seen in an overlap
+        if ref not in has_good:
+            return
+        
+        #
+        #if len(n_alleles) > 1:
+        #    major, second = n_alleles.most_common(2)
+        #    if second[1] >= self.min_filter_count:
+        #        continue
+        #    else:
+        #        major = n_alleles.most_common(1)
+        
+        #if (n_allele[allele]/N) > self.max_bad_frac:
+            likely_variant = True
+        #if major_allele is None:
+        #    
+
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
             if event_type == 'good':
-                good_kmers[(base_qual, mut_type, kmer)] += 1
+                if ref != allele or len(has_good) == 1:
+                    good_kmers[(base_qual, mut_type, kmer)] += 1
                 #good_kmers[base_qual][mut_type][kmer] += 1
             elif event_type == 'bad':
-                if allele not in has_good and n_allele[allele] < self.max_bad_alt:
+                #OBS: Have commented this out. 2023.02.02
+                # Isince it would create a bias to have a filter on bad sites that
+                # is not applied to good sites. 
+                # We do not considder bad variants at sites where
+                #if (allele not in has_good and 
+                #    (n_allele[allele]/N) < self.max_bad_frac):
+                # 
+                if len(has_good) == 1:
                     bad_kmers[(base_qual, mut_type, kmer)] += 1
                     #bad_kmers[base_qual][mut_type][kmer] += 1

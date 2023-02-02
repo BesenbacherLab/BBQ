@@ -155,9 +155,12 @@ class SomaticMutationCaller:
                     if not pos is None:
                         filter_alleles.add(pread.alignment.query_sequence[pos])
                     N_filter += 1
-
                 if N_filter < self.min_filter_depth or N_filter > self.max_filter_depth:
                     continue
+                
+                #TODO: should maybe not filter all alleles seen just once. But have a min count:
+                #filter_alleles = [x for x,y in n_alleles.items() if y >= self.min_filter_count]
+
 
                 n_calls += self.handle_pileup(pileupcolumn, filter_alleles)
         else:

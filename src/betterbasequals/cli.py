@@ -177,7 +177,8 @@ def run_get_good_and_bad_w_filter(opts):
         MutationCounterWFilter(
             opts.bam_file, 
             opts.twobit_file, 
-            opts.filter_bam_file)
+            opts.filter_bam_file,
+            radius = opts.radius)
     if opts.chrom is None:
         good_kmers, bad_kmers = \
             counter.count_mutations_all_chroms()
