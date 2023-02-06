@@ -26,15 +26,23 @@ class MutationCounterWFilter:
         max_depth=1000000, 
         radius=3, 
         prefix="", 
-        max_bad_frac=0.05,
+        max_alt_frac = None,
         min_filter_count = 2,
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
         if filter_bam_file is None:
             self.filter_bam_file = None
+            if max_alt_frac is None:
+                #Set default to filter heterozygous variants if no filter is used:
+                self.max_alt_frac = 0.2
         else:
             self.filter_bam_file = open_bam_w_index(filter_bam_file)
+            if max_alt_frac is None:
+                #Should I have different default here?
+                #Maybe 1.0 corresponding to no filter?
+                self.max_alt_frac = 0.2
+
         self.tb = py2bit.open(twobit_file)
    
         self.mapq = mapq
@@ -45,7 +53,6 @@ class MutationCounterWFilter:
         self.max_depth = max_depth
         self.radius = radius
         self.prefix = prefix
-        self.max_bad_alt = max_bad_frac
         self.min_filter_count = min_filter_count
 
     def __del__(self):
@@ -139,6 +146,7 @@ class MutationCounterWFilter:
 
         ref = kmer[self.radius]
 
+        #If the major in the filter bam file does not match the ref we ignore the site.
         if major_allele is not None and major_allele != ref:
             return
 
@@ -152,7 +160,7 @@ class MutationCounterWFilter:
         coverage = 0
 
         has_good = set()
-        n_allele = Counter()
+        n_alleles = Counter()
 
         for pileup_read in pileupcolumn.pileups:
             # test for deletion at pileup
@@ -174,7 +182,7 @@ class MutationCounterWFilter:
                 continue
 
             if read.base_qual > 30:
-                n_allele[read.allel] += 1
+                n_alleles[read.allel] += 1
 
             # Look for read partner
             if read.query_name in reads_mem:
@@ -200,31 +208,34 @@ class MutationCounterWFilter:
                 reads_mem[read.query_name] = read
         if coverage < self.min_depth or coverage > self.max_depth:
             return
-        N = sum(n_allele.values())
+        
+        N = sum(n_alleles.values())
 
-        #We ignore sites where matching reference allele aren't seen in an overlap
-        if ref not in has_good:
+        # We ignore sites where matching reference allele aren't seen in an overlap
+        # OBS: Have commented out. 2023.06.02
+        # In files with litlle overap we maybe should not require this.
+        #if ref not in has_good:
+        #    return
+                
+        if len(n_alleles) > 1:
+            major, second = n_alleles.most_common(2)
+            # If we see a high fraction of an alternative allele we ignore the site.
+            if second[1]/N >= self.max_alt_frac:
+                return
+        else:
+            major = n_alleles.most_common(1)
+
+        #If the major allele is no the ref allele we ignore the site.
+        if major[0] != ref:
             return
-        
-        #
-        #if len(n_alleles) > 1:
-        #    major, second = n_alleles.most_common(2)
-        #    if second[1] >= self.min_filter_count:
-        #        continue
-        #    else:
-        #        major = n_alleles.most_common(1)
-        
-        #if (n_allele[allele]/N) > self.max_bad_frac:
-            likely_variant = True
-        #if major_allele is None:
-        #    
+
 
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
             if event_type == 'good':
-                if ref != allele or len(has_good) == 1:
-                    good_kmers[(base_qual, mut_type, kmer)] += 1
-                #good_kmers[base_qual][mut_type][kmer] += 1
+                #if ref != allele or len(has_good) == 1:
+                good_kmers[(base_qual, mut_type, kmer)] += 1
+
             elif event_type == 'bad':
                 #OBS: Have commented this out. 2023.02.02
                 # Isince it would create a bias to have a filter on bad sites that
@@ -233,6 +244,6 @@ class MutationCounterWFilter:
                 #if (allele not in has_good and 
                 #    (n_allele[allele]/N) < self.max_bad_frac):
                 # 
-                if len(has_good) == 1:
-                    bad_kmers[(base_qual, mut_type, kmer)] += 1
-                    #bad_kmers[base_qual][mut_type][kmer] += 1
+                #if len(has_good) == 1:
+                bad_kmers[(base_qual, mut_type, kmer)] += 1
+
