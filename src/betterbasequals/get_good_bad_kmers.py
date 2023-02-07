@@ -58,7 +58,7 @@ class MutationCounterWFilter:
     def __del__(self):
         self.tb.close()
 
-    def count_mutation_all_chroms(self):
+    def count_mutations_all_chroms(self):
         good_kmers = Counter()
         bad_kmers = Counter()
         for idx_stats in self.bam_file.get_index_statistics():
@@ -222,8 +222,10 @@ class MutationCounterWFilter:
             # If we see a high fraction of an alternative allele we ignore the site.
             if second[1]/N >= self.max_alt_frac:
                 return
-        else:
+        elif len(n_alleles) == 1:
             major = n_alleles.most_common(1)
+        else:
+            return
 
         #If the major allele is no the ref allele we ignore the site.
         if major[0] != ref:
