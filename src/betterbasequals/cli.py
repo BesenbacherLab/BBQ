@@ -205,7 +205,7 @@ def run_empirical_quality(opts):
     read_length = max(max(tup[1] for tup in n_double.keys()), max(tup[1] for tup in n_single.keys()))
 
     print_empirical_qualities(opts, n_double, read_length, "double")
-    print_empirical_qualities(opts, n_double, read_length, "single")
+    print_empirical_qualities(opts, n_single, read_length, "single")
 
 
 
