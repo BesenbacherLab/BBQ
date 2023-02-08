@@ -24,8 +24,8 @@ class EmpiricalQuality:
         self.validation_bam_file = open_bam_w_index(validation_bam_file)
         self.tb = py2bit.open(twobit_file)
         self.radius = 2
-        self.min_filter_depth = 0
-        self.min_filter_BQ = 30
+        self.min_filter_depth = 10
+        self.min_filter_BQ = 80
 
     def __del__(self):
         self.tb.close()
