@@ -5,6 +5,7 @@ from betterbasequals.get_good_bad_kmers import MutationCounterWFilter
 from betterbasequals.model_validators import MutationValidator
 from betterbasequals.bam_adjusters import BaseAdjuster
 from betterbasequals.somatic_callers import SomaticMutationCaller
+from betterbasequals.empirical_quality import EmpiricalQuality
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from betterbasequals.kmerpapa_utils import get_kmerpapa
@@ -45,6 +46,9 @@ def get_parser():
     # args for filter bam file
     filter_parent = argparse.ArgumentParser(add_help=False)
     filter_parent.add_argument("--filter_bam_file", help="bam file from blood")
+    filter_parent.add_argument('--filter_min_BQ', type=int, default=20,
+        help="minimum BQ cutoff used in filter_bam_file")
+
 
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
@@ -156,6 +160,14 @@ def get_parser():
         help = 'Call variants',
         parents=[bam_parent, filter_parent, call_parent])
     call_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
+
+    empirical_quality_parser = subparsers.add_parser('empirical_quality', 
+        description = 'Estimate empirical quality.',
+        help = 'Estimate empirical quality.',
+        parents=[bam_parent, filter_parent])
+    empirical_quality_parser.add_argument('--outfile', 
+        type=argparse.FileType('w'), default=sys.stdout, help="output file")
+
     
     test_kmerpapa_parser = subparsers.add_parser('test_kmerpapa', 
         description = 'Apply a kmerpapa model to a set of kmer counts',
@@ -168,6 +180,33 @@ def get_parser():
         choices=["bad_vs_good", "bad_vs_no"])
     test_kmerpapa_parser.add_argument('--same_good', action='store_true')
     return parser
+
+
+def run_empirical_quality(opts):
+    if opts.verbosity > 0:
+        eprint("Estimating empirical quality")
+    estimator = \
+        EmpiricalQuality(
+            opts.bam_file, 
+            opts.filter_bam_file,
+            opts.twobit_file, 
+            )
+    if opts.chrom is None:
+        n_double, n_single = estimator.count_mutations_all_chroms()
+    else:
+        n_double, n_single = estimator.count_mutations(opts.chrom, opts.start, opts.end)
+    
+    total_doubles = sum(sum(x.values()) for x in n_double.values())
+    total_singles = sum(sum(x.values()) for x in n_single.values())
+
+    eprint(f'Counted {total_doubles} matching overlapping alleles.')
+    eprint(f'Counted {total_singles} non-overlapping alleles.')
+
+    read_length = max(max(tup[1] for tup in n_double.keys()), max(tup[1] for tup in n_single.keys()))
+
+    print_empirical_qualities(opts, n_double, read_length, "double")
+    print_empirical_qualities(opts, n_double, read_length, "single")
+
 
 
 def run_get_good_and_bad_w_filter(opts):
@@ -301,6 +340,7 @@ def run_call(opts, kmer_papas):
             opts.outfile,
             opts.method,
             opts.cutoff,
+            min_base_qual_filter = opts.filter_min_BQ,
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()
@@ -365,6 +405,10 @@ def main(args = None):
     if opts.command is None:
         parser.print_help(sys.stderr)
         return 1
+    
+    if opts.command == "empirical_quality":
+        run_empirical_quality(opts)
+        return 0
 
     if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
         good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)

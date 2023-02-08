@@ -302,6 +302,29 @@ def print_good_and_bad(opts, good_kmers, bad_kmers):
             print(bqual, mtype, kmer, count , file = opts.output_file_bad)
         opts.output_file_bad.close()
 
+def print_empirical_qualities(opts, n_alleles, read_length, allele_type):
+    for tup in n_alleles:
+        n_total_A = sum(y for x,y in n_alleles[tup].items() if x[0]=='A')
+        n_total_C = sum(y for x,y in n_alleles[tup].items() if x[0]=='C')
+        for mtype in n_alleles[tup]:
+            if mtype[0] == 'A':
+                n_total = n_total_A
+            elif mtype[0] == 'C':
+                n_total = n_total_C
+            else:
+                raise f"Invalid mutation type {mtype}"
+
+            p_error = (n_alleles[tup][mtype] + 0.1) / (n_total + 0.4)
+            if mtype[0] == mtype[-1]:
+                mtype = mtype[0] + '->' + '?'
+                p_error = 1.0 - p_error
+            if tup[2]:
+                pos = tup[1] - (read_length+1)
+            else:
+                pos = tup[1] + 1
+            print(tup[0], pos, mtype, allele_type, p2phred(p_error), n_alleles[tup][mtype], n_total, file=opts.outfile)
+
+
 def parse_opts_region(opts):
     if opts.region is None:
         opts.chrom = None
