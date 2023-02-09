@@ -2,6 +2,7 @@ import py2bit
 from scipy.optimize import minimize_scalar
 from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred
 from betterbasequals.pilup_handlers import get_alleles_w_probabities
+from collections import Counter
 import scipy.stats
 
 def GQ_sum(alt_BQs, ref_BQs):
@@ -97,7 +98,7 @@ class SomaticMutationCaller:
         #TODO: filter_depth variable should be set based on average coverage in filter file.
         self.min_filter_depth = 10
         self.max_filter_depth = 1000000
-
+        self.min_filter_count = 2
         # Create correction factor dict:
 
         # self.correction_factor = {mtype:{} for mtype in kmer_papa}
@@ -116,9 +117,7 @@ class SomaticMutationCaller:
         n_calls = 0
         for idx_stats in self.bam_file.get_index_statistics():
             if idx_stats.mapped > 0:
-                print(idx_stats.contig, self.bam_file.get_reference_length(idx_stats.contig))
                 n_calls += self.call_mutations(idx_stats.contig, None, None)
-            
         return n_calls
 
     def call_mutations(self, chrom, start, stop):
@@ -130,8 +129,8 @@ class SomaticMutationCaller:
             max_depth = 1000000,
             min_mapping_quality = self.mapq,
             ignore_overlaps = False,
-            flag_require = 2,  # proper paired
-            flag_filter = 3848,
+            flag_require = 0,  # No requirements
+            flag_filter = 3840,
             min_base_quality = self.min_base_qual,
         )
         n_calls = 0
@@ -144,24 +143,19 @@ class SomaticMutationCaller:
                 min_mapping_quality = self.filter_mapq,
                 ignore_overlaps = False,
                 flag_require = 2,  # proper paired
-                flag_filter = 3848,
+                flag_filter = 3840,
                 min_base_quality = self.min_base_qual_filter,
             )
             for pileupcolumn, filter_pc in zip_pileups_single_chrom(pileup, filter_pileup):
-                N_filter = 0
-                filter_alleles = set()
+                n_alleles = Counter()
                 for pread in filter_pc.pileups:
                     pos = pread.query_position
                     if not pos is None:
-                        filter_alleles.add(pread.alignment.query_sequence[pos])
-                    N_filter += 1
+                        n_alleles[pread.alignment.query_sequence[pos]] += 1
+                    N_filter = sum(n_alleles.values())
                 if N_filter < self.min_filter_depth or N_filter > self.max_filter_depth:
                     continue
-                
-                #TODO: should maybe not filter all alleles seen just once. But have a min count:
-                #filter_alleles = [x for x,y in n_alleles.items() if y >= self.min_filter_count]
-
-
+                filter_alleles = [x for x,y in n_alleles.items() if y >= self.min_filter_count]
                 n_calls += self.handle_pileup(pileupcolumn, filter_alleles)
         else:
             for pileupcolumn in pileup:
@@ -189,18 +183,6 @@ class SomaticMutationCaller:
             return 0
 
         if self.method == 'poisson':
-            base_probs, seen_alts = get_alleles_w_probabities(pileupcolumn, ref, kmer, self.mut_probs)
-            #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
-            for A in seen_alts:
-                if A in filter_alleles:
-                    continue
-                LR, N, N_A, AF = get_LR(base_probs[A])
-                # make LR into p-value
-                p_val = scipy.stats.chi2.sf(-2*LR, 2)
-                #print(f'pval=={p_val}')
-                if p_val < self.cutoff:
-                    print(f'{chrom}\t{ref_pos}\t{ref}\t{A}\tpval={p_val};LR={LR};AF={AF};N={N};N_A={N_A}', file=self.outfile)
-
             raise NotImplementedError
             #make new pileup handler
         elif self.method == 'sum':
