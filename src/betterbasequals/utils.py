@@ -314,15 +314,17 @@ def print_empirical_qualities(opts, n_alleles, read_length, allele_type):
             else:
                 raise f"Invalid mutation type {mtype}"
 
-            p_error = (n_alleles[tup][mtype] + 0.1) / (n_total + 0.4)
+            #p_error = (n_alleles[tup][mtype] + 0.1) / (n_total + 0.4)
             if mtype[0] == mtype[-1]:
-                mtype = mtype[0] + '->' + '?'
-                p_error = 1.0 - p_error
+                continue
+                #mtype = mtype[0] + '->' + '?'
+                #p_error = 1.0 - p_error
             if tup[2]:
                 pos = tup[1] - (read_length+1)
             else:
                 pos = tup[1] + 1
-            print(tup[0], pos, mtype, allele_type, p2phred(p_error), n_alleles[tup][mtype], n_total, file=opts.outfile)
+            #print(tup[0], pos, mtype, allele_type, p2phred(p_error), n_alleles[tup][mtype], n_total, file=opts.outfile)
+            print(tup[0], pos, mtype, allele_type, n_alleles[tup][mtype], n_total, file=opts.outfile)
 
 
 def parse_opts_region(opts):

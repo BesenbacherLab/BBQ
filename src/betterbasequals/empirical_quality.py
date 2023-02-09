@@ -48,8 +48,8 @@ class EmpiricalQuality:
             max_depth = 1000000,
             min_mapping_quality=mapq,
             ignore_overlaps=False,
-            flag_require=2,  # proper paired
-            flag_filter=3848,
+            flag_require=0,  # proper paired
+            flag_filter=3840,
             min_base_quality = 1,
         )
         Hifi_pileup = self.validation_bam_file.pileup(
@@ -58,7 +58,7 @@ class EmpiricalQuality:
             stop=stop,
             truncate=True,
             min_mapping_quality=mapq_hifi,
-            flag_filter=3848,
+            flag_filter=3840,
             min_base_quality = self.min_filter_BQ,
         )
         if n_double is None:
@@ -115,7 +115,7 @@ class EmpiricalQuality:
             coverage = 0
 
             muttype = {x: get_mut_type(ref, x) for x in ['A','C','G','T']}
-
+            n_alt += 1
             for pileup_read in pileupcolumn.pileups:
                 # test for deletion at pileup
                 if pileup_read.is_del or pileup_read.is_refskip:
@@ -134,29 +134,44 @@ class EmpiricalQuality:
                     #or read.NH != 1
                 ):
                     continue
-
+                events = []
                 # Look for read partner
                 if read.query_name in reads_mem:
                     # found partner process read pair
                     mem_read = reads_mem.pop(read.query_name)
 
                     if read.allel == mem_read.allel:
+                        if read.allel != ref:
+                            n_alt +=1
                         if read.base_qual != mem_read.base_qual:
                             continue
                         if read.isR1:
-                            n_double[(read.base_qual, read.pos, True)][muttype[read.allel]] += 1
+                            events.append(("double", read.base_qual, read.pos, True, muttype[read.allel]))
+                            #n_double[(read.base_qual, read.pos, True)][muttype[read.allel]] += 1
                         else:
-                            n_double[(read.base_qual, mem_read.pos, True)][muttype[read.allel]] += 1
+                            events.append(("double", read.base_qual, mem_read.pos, True, muttype[read.allel]))
+                            #n_double[(read.base_qual, mem_read.pos, True)][muttype[read.allel]] += 1
                 else:            
                     reads_mem[read.query_name] = read
             
             # Handle reads without partner (ie. no overlap)
             for read in reads_mem.values():
-                n_single[(read.base_qual, read.pos, read.isR1)][muttype[read.allel]] += 1
+                if read.allel != ref:
+                    n_alt += 1
+                events.append(("single", read.base_qual, read.pos, read.isR1, muttype[read.allel]))
+                #n_single[("single", read.base_qual, read.pos, read.isR1)][muttype[read.allel]] += 1
 
-            if coverage > 0:
+
+            if coverage > 10 and n_alt < 3:
                 n_used_sites += 1
-
+                for atype, BQ, pos, isR1, mtype in events:
+                    if atype == "single":
+                        n_single[("single", BQ, pos, isR1)][mtype] += 1
+                    else:
+                        n_double[("double", BQ, pos, isR1)][mtype] += 1
+            else:
+                n_filtered_sites += 1
+        
         eprint(f'Filtered {n_filtered_sites} sites due to low coverage or alternative alleles in filter_bam_file.')
         eprint(f'Counted alleles at {n_used_sites} sites.')
 
