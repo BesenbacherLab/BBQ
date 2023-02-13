@@ -4,6 +4,7 @@ from kmerpapa.algorithms import bottum_up_array_penalty_plus_pseudo_CV
 from kmerpapa.algorithms import bottum_up_array_w_numba
 from kmerpapa.pattern_utils import get_M_U, generality
 from math import log10
+from importlib import reload
 import argparse
 
 def get_kmerpapa(super_pattern, contextD, opts):
@@ -40,6 +41,10 @@ def get_kmerpapa(super_pattern, contextD, opts):
         args.seed = opts.seed
         pseudo_counts = opts.pseudo_counts
         penalty_values = opts.penalty_values
+        #Right now it is necessary to reload kmerpapa as it uses global variables with numba.
+        #If if remove the global variables in kmerpapa I can skip these lines.
+        reload(bottum_up_array_penalty_plus_pseudo_CV)
+        reload(bottum_up_array_w_numba)
         best_alpha, best_penalty, test_score = bottum_up_array_penalty_plus_pseudo_CV.pattern_partition_bottom_up(super_pattern, contextD, pseudo_counts, args, n_bad, n_good, penalty_values)
         best_beta = (best_alpha*(1.0-my))/my
         best_score, M, U, names = bottum_up_array_w_numba.pattern_partition_bottom_up(super_pattern, contextD, best_alpha, best_beta, best_penalty, opts, n_bad, n_good, index_mut=0)
