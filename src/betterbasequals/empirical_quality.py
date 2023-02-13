@@ -115,7 +115,7 @@ class EmpiricalQuality:
             coverage = 0
 
             muttype = {x: get_mut_type(ref, x) for x in ['A','C','G','T']}
-            n_alt += 1
+            n_alt = 0
             for pileup_read in pileupcolumn.pileups:
                 # test for deletion at pileup
                 if pileup_read.is_del or pileup_read.is_refskip:
