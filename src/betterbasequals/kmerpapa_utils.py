@@ -54,7 +54,7 @@ def get_kmerpapa(super_pattern, contextD, opts):
         pat = names[i]
         M, U = counts[i]
         p = (M + best_alpha)/(M + U + best_alpha + best_beta)
-        eprint(pat, p)
+        #eprint(pat, p)
         D[pat] = -10*log10(p)
         x += generality(pat)
     assert x == generality(super_pattern)
