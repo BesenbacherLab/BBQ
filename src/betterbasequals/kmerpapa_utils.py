@@ -2,7 +2,7 @@ from betterbasequals.utils import eprint
 from kmerpapa.algorithms import greedy_penalty_plus_pseudo
 from kmerpapa.algorithms import bottum_up_array_penalty_plus_pseudo_CV
 from kmerpapa.algorithms import bottum_up_array_w_numba
-from kmerpapa.pattern_utils import get_M_U
+from kmerpapa.pattern_utils import get_M_U, generality
 from math import log10
 import argparse
 
@@ -49,10 +49,13 @@ def get_kmerpapa(super_pattern, contextD, opts):
     for pat in names:
         counts.append(get_M_U(pat, contextD))
     D = {}
+    x = 0
     for i in range(len(names)):
         pat = names[i]
         M, U = counts[i]
         p = (M + best_alpha)/(M + U + best_alpha + best_beta)
-        eprint(pat, p)
+        #eprint(pat, p)
         D[pat] = -10*log10(p)
+        x += generality(pat)
+    assert x == generality(super_pattern)
     return D

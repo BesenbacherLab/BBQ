@@ -224,8 +224,8 @@ def read_kmers(opts):
         bqual = int(bqual)
         if bqual not in good_kmers:
             good_kmers[bqual] = {}
-            for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
-                good_kmers[bqual][mtype] = defaultdict(int)
+            for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
+                good_kmers[bqual][muttype] = defaultdict(int)
         good_kmers[bqual][mtype][kmer] = int(count)
 
     bad_kmers = {}
@@ -234,8 +234,8 @@ def read_kmers(opts):
         bqual = int(bqual)
         if bqual not in bad_kmers:
             bad_kmers[bqual] = {}
-            for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-                bad_kmers[bqual][mtype] = defaultdict(int)
+            for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+                bad_kmers[bqual][muttype] = defaultdict(int)
         bad_kmers[bqual][mtype][kmer] = int(count)
     return good_kmers, bad_kmers
 
