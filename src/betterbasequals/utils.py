@@ -306,6 +306,11 @@ def print_empirical_qualities(opts, n_alleles, read_length, allele_type):
     for tup in n_alleles:
         n_total_A = sum(y for x,y in n_alleles[tup].items() if x[0]=='A')
         n_total_C = sum(y for x,y in n_alleles[tup].items() if x[0]=='C')
+        BQ, pos, isR1  = tup
+        if isR1:
+            pos = pos - (read_length+1)
+        else:
+            pos = pos + 1
         for mtype in n_alleles[tup]:
             if mtype[0] == 'A':
                 n_total = n_total_A
@@ -319,12 +324,9 @@ def print_empirical_qualities(opts, n_alleles, read_length, allele_type):
                 continue
                 #mtype = mtype[0] + '->' + '?'
                 #p_error = 1.0 - p_error
-            if tup[2]:
-                pos = tup[1] - (read_length+1)
-            else:
-                pos = tup[1] + 1
+                
             #print(tup[0], pos, mtype, allele_type, p2phred(p_error), n_alleles[tup][mtype], n_total, file=opts.outfile)
-            print(tup[0], pos, mtype, allele_type, n_alleles[tup][mtype], n_total, file=opts.outfile)
+            print(BQ, pos, mtype, allele_type, n_alleles[tup][mtype], n_total, file=opts.outfile)
 
 
 def parse_opts_region(opts):

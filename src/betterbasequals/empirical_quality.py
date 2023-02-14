@@ -149,7 +149,7 @@ class EmpiricalQuality:
                             events.append(("double", read.base_qual, read.pos, True, muttype[read.allel]))
                             #n_double[(read.base_qual, read.pos, True)][muttype[read.allel]] += 1
                         else:
-                            events.append(("double", read.base_qual, mem_read.pos, True, muttype[read.allel]))
+                            events.append(("double", mem_read.base_qual, mem_read.pos, True, muttype[read.allel]))
                             #n_double[(read.base_qual, mem_read.pos, True)][muttype[read.allel]] += 1
                 else:            
                     reads_mem[read.query_name] = read
@@ -166,9 +166,9 @@ class EmpiricalQuality:
                 n_used_sites += 1
                 for atype, BQ, pos, isR1, mtype in events:
                     if atype == "single":
-                        n_single[("single", BQ, pos, isR1)][mtype] += 1
+                        n_single[(BQ, pos, isR1)][mtype] += 1
                     else:
-                        n_double[("double", BQ, pos, isR1)][mtype] += 1
+                        n_double[(BQ, pos, isR1)][mtype] += 1
             else:
                 n_filtered_sites += 1
         
