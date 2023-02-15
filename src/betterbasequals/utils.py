@@ -311,7 +311,7 @@ def print_empirical_qualities(opts, n_alleles, read_length, allele_type):
             pos = pos - (read_length+1)
         else:
             pos = pos + 1
-        for mtype in n_alleles[tup]:
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             if mtype[0] == 'A':
                 n_total = n_total_A
             elif mtype[0] == 'C':
@@ -320,11 +320,9 @@ def print_empirical_qualities(opts, n_alleles, read_length, allele_type):
                 raise f"Invalid mutation type {mtype}"
 
             #p_error = (n_alleles[tup][mtype] + 0.1) / (n_total + 0.4)
-            if mtype[0] == mtype[-1]:
-                continue
                 #mtype = mtype[0] + '->' + '?'
                 #p_error = 1.0 - p_error
-                
+
             #print(tup[0], pos, mtype, allele_type, p2phred(p_error), n_alleles[tup][mtype], n_total, file=opts.outfile)
             print(BQ, pos, mtype, allele_type, n_alleles[tup][mtype], n_total, file=opts.outfile)
 
