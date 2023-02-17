@@ -60,7 +60,7 @@ class MutationValidator:
             max_depth = 1000000,
             min_mapping_quality=mapq,
             ignore_overlaps=False,
-            flag_require=2,  # proper paired
+            flag_require=0,  # proper paired
             flag_filter=3848,
             min_base_quality = 1,
         )
@@ -172,9 +172,9 @@ class MutationValidator:
             if ref not in "ATGC":
                 continue
 
-            corrected_base_quals, n_ref = get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, self.correction_factor)
+            corrected_base_quals, n_ref, n_mismatch = get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, self.correction_factor)
 
-            n_alt = sum(len(corrected_base_quals[x]) for x in corrected_base_quals)
+            #n_alt = sum(len(corrected_base_quals[x]) for x in corrected_base_quals)
 
             hifi_basequals = get_alleles_w_quals(hifi_pc)
             n_hifi_reads = sum(len(hifi_basequals[x]) for x in hifi_basequals)
@@ -184,8 +184,9 @@ class MutationValidator:
                     continue
                 
                 # Variant quality
-                corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
-                corr_var_qual2 = sum(x[1] for x in corrected_base_quals[A])
-                uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
+                #corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
+                #corr_var_qual2 = sum(x[1] for x in corrected_base_quals[A])
+                #uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
                 for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
-                    print(chrom, ref_pos, A, int(corrected_Q), uncorrected_Q, base_type, sum(hifi_basequals[A]), n_hifi_reads)
+                    print(int(corrected_Q), uncorrected_Q, base_type, sum(1 for x in hifi_basequals[A] if x>80), n_mismatch)
+                    #print(chrom, ref_pos, A, int(corrected_Q), uncorrected_Q, base_type, sum(hifi_basequals[A]), n_mismatch, n_hifi_reads)

@@ -128,6 +128,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
 
     #tmp: counting ref... can be removed later
     n_ref = 0
+    n_mismatch = 0
 
     for pileup_read in pileupcolumn.pileups:
         # test for deletion at pileup
@@ -163,10 +164,11 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
                     continue
                 adjusted_base_qual1 = correction_factor[read.base_qual][mut_type][kmer]
                 adjusted_base_qual2 = correction_factor[mem_read.base_qual][mut_type][kmer]
-                adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
+                adjusted_base_qual = max(adjusted_base_qual1, adjusted_base_qual2) + 3
                 unadjusted_base_qual = max(read.base_qual, mem_read.base_qual)
-                base_quals[read.allel].append((adjusted_base_qual1 + adjusted_base_qual2, unadjusted_base_qual, 1))
+                base_quals[read.allel].append((adjusted_base_qual, unadjusted_base_qual, 1))
             else:
+                n_mismatch += 1
                 #Are ignoring ref alleles pt... should adjust later
                 if read.allel != ref:
                     base_quals[read.allel].append((0, read.base_qual, 2))
@@ -189,10 +191,10 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
             base_quals[read.allel].append((adjusted_base_qual, read.base_qual, 3))
         else:
             n_ref += 1
-    return base_quals, n_ref
+    return base_quals, n_ref, n_mismatch
 
 
-def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor):
+def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, double_adjustment="max_plus3"):
     """
     Returns a dictionary that maps from allele A to a list of tuples with probability of 
     observing Alt allele A given then read and probability of observing ref allele R given 
@@ -246,15 +248,22 @@ def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor):
                     muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
                     adjusted_base_qual_from_A1 = correction_factor[read.base_qual][muttype_from_A][kmer_from_A]
                     adjusted_base_qual_from_A2 = correction_factor[mem_read.base_qual][muttype_from_A][kmer_from_A]
-                    adjusted_base_qual_from_A = adjusted_base_qual_from_A1 + adjusted_base_qual_from_A2
+                    
+                    if double_adjustment == "mult":
+                        adjusted_base_qual_from_A = adjusted_base_qual_from_A1 + adjusted_base_qual_from_A2
+                    elif double_adjustment == "max_plus3":
+                        adjusted_base_qual_from_A = max(adjusted_base_qual_from_A1, adjusted_base_qual_from_A2) + 3
 
                     muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
                     adjusted_base_qual_from_R1 = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
                     adjusted_base_qual_from_R2 = correction_factor[mem_read.base_qual][muttype_from_R][kmer_from_R]
-                    adjusted_base_qual_from_R = adjusted_base_qual_from_R1 + adjusted_base_qual_from_R2
-
+                    
+                    if double_adjustment == "mult":
+                        adjusted_base_qual_from_R = adjusted_base_qual_from_R1 + adjusted_base_qual_from_R2
+                    elif double_adjustment == "max_plus3":
+                        adjusted_base_qual_from_R = max(adjusted_base_qual_from_R1, adjusted_base_qual_from_R2) + 3
+                        
                     base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R))
-
 
         else:            
             reads_mem[read.query_name] = read
@@ -321,7 +330,8 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
 
                 #adjusted_base_qual1 = read.base_qual + correction_factor[mut_type][kmer]
                 #adjusted_base_qual2 = mem_read.base_qual + correction_factor[mut_type][kmer]
-                adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
+                #adjusted_base_qual = adjusted_base_qual1 + adjusted_base_qual2
+
                 change_dict[(read.query_name, read.isR1)].append((read.pos, read.base_qual, read.allel, int(adjusted_base_qual1), 1))
                 change_dict[(mem_read.query_name, mem_read.isR1)].append((mem_read.pos, mem_read.base_qual, mem_read.allel, int(adjusted_base_qual2), 1))
 

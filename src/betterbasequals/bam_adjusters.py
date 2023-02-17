@@ -49,10 +49,10 @@ class BaseAdjuster:
             max_depth = 1000000,
             min_mapping_quality=mapq,
             ignore_overlaps=False,
-            flag_require=2,  # proper paired
+            flag_require=0,  # proper paired
             flag_filter=3848,
         )
-
+        
         change_dict = defaultdict(list)
 
         # Fill dict with changes:
