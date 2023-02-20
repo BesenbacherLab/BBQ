@@ -107,29 +107,30 @@ class MutationValidator:
             n_ref_filter, n_alt_filter = get_pileup_count(filter_pc, ref, min_base_qual_filter, blood=True)
             N_filter = n_ref_filter + sum(n_alt_filter.values())
             #TODO: replace hardcoded numbers with values relative to mean coverage
-            if N_filter < 25 or N_filter > 55:
+            if N_filter < 25 or N_filter > 55 or n_ref_filter < 5:
                 continue
 
-            corrected_base_quals, n_ref, n_mismatch = get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, self.correction_factor)
+            corrected_base_quals, n_ref, n_mismatch, n_double = get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, self.correction_factor)
 
-            n_alt = sum(len(corrected_base_quals[x]) for x in corrected_base_quals)
+            #n_alt = sum(len(corrected_base_quals[x]) for x in corrected_base_quals)
 
             hifi_basequals = get_alleles_w_quals(hifi_pc)
             n_hifi_reads = sum(len(hifi_basequals[x]) for x in hifi_basequals)
             
-            for A in [x for x in ['A','C','G','T'] if x != ref]:
-                if len(corrected_base_quals[A]) == 0:
-                    continue
-                #if n_alt_filter[A] > 0:
-                #    continue
+            if n_hifi_reads > 100:
+                continue
+
+            all_mismatch = sum(n_mismatch.values())            
+
+            for A in [x for x in ['A','C','G','T'] if x != ref]:    
                 # Variant quality
                 #corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
                 #corr_var_qual2 = sum(x[1] for x in corrected_base_quals[A])
                 #uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
+                n_alt = sum(1 for x in corrected_base_quals[A] if x[1]>35)
+                seen_hifi = sum(1 for x in hifi_basequals[A] if x>80) > 0
                 for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
-                    print(int(corrected_Q), uncorrected_Q, base_type, sum(1 for x in hifi_basequals[A] if x>80), n_mismatch, n_alt_filter[A])
-                #for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
-                #    print(chrom, ref_pos, A, int(corrected_Q), uncorrected_Q, base_type, n_alt_filter[A], sum(hifi_basequals[A]), n_hifi_reads)
+                    print(int(corrected_Q), uncorrected_Q, base_type, seen_hifi, n_mismatch[A], all_mismatch, n_double, n_alt)
                     
     def call_mutations_no_filter(self, chrom, start, stop, mapq=50, mapq_hifi=40, prefix=""):
         pileup = self.bam_file.pileup(
