@@ -174,21 +174,20 @@ class MutationValidator:
             if ref not in "ATGC":
                 continue
 
-            corrected_base_quals, n_ref, n_mismatch = get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, self.correction_factor)
+            corrected_base_quals, n_ref, n_mismatch, n_double = get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, self.correction_factor)
 
             #n_alt = sum(len(corrected_base_quals[x]) for x in corrected_base_quals)
 
             hifi_basequals = get_alleles_w_quals(hifi_pc)
-            n_hifi_reads = sum(len(hifi_basequals[x]) for x in hifi_basequals)
-            
-            for A in [x for x in ['A','C','G','T'] if x != ref]:
-                if len(corrected_base_quals[A]) == 0:
-                    continue
-                
+            #n_hifi_reads = sum(len(hifi_basequals[x]) for x in hifi_basequals)
+            all_mismatch = sum(n_mismatch.values())            
+
+            for A in [x for x in ['A','C','G','T'] if x != ref]:    
                 # Variant quality
                 #corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
                 #corr_var_qual2 = sum(x[1] for x in corrected_base_quals[A])
                 #uncorr_var_qual = sum(x[2] for x in corrected_base_quals[A])
+
                 for corrected_Q, uncorrected_Q, base_type in corrected_base_quals[A]:
-                    print(int(corrected_Q), uncorrected_Q, base_type, sum(1 for x in hifi_basequals[A] if x>80), n_mismatch)
+                    print(int(corrected_Q), uncorrected_Q, base_type, sum(1 for x in hifi_basequals[A] if x>80), n_mismatch[A], all_mismatch, n_double)
                     #print(chrom, ref_pos, A, int(corrected_Q), uncorrected_Q, base_type, sum(hifi_basequals[A]), n_mismatch, n_hifi_reads)

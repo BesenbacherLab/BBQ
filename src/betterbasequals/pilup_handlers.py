@@ -128,7 +128,8 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
 
     #tmp: counting ref... can be removed later
     n_ref = 0
-    n_mismatch = 0
+    n_mismatch = Counter()
+    n_double = 0
 
     for pileup_read in pileupcolumn.pileups:
         # test for deletion at pileup
@@ -153,6 +154,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
             # found partner process read pair
             mem_read = reads_mem.pop(read.query_name)
 
+            n_double += 1
             # We ignore alleles where pair doesn't match (could add else clause to handle)
             ## Have now done so to test --- Can maybe delete later
             if read.allel == mem_read.allel:
@@ -168,15 +170,17 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
                 unadjusted_base_qual = max(read.base_qual, mem_read.base_qual)
                 base_quals[read.allel].append((adjusted_base_qual, unadjusted_base_qual, 1))
             else:
-                n_mismatch += 1
+                
                 #Are ignoring ref alleles pt... should adjust later
                 if read.allel != ref:
+                    n_mismatch[read.allel] += 1
                     base_quals[read.allel].append((0, read.base_qual, 2))
                 else:
                     n_ref += 1
                 #Are ignoring ref alleles pt... should adjust later
                 if mem_read.allel != ref:
-                    base_quals[read.allel].append((0, mem_read.base_qual, 2))
+                    n_mismatch[mem_read.allel] += 1
+                    base_quals[mem_read.allel].append((0, mem_read.base_qual, 2))
                 else:
                     n_ref += 1
 
@@ -191,7 +195,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
             base_quals[read.allel].append((adjusted_base_qual, read.base_qual, 3))
         else:
             n_ref += 1
-    return base_quals, n_ref, n_mismatch
+    return base_quals, n_ref, n_mismatch, n_double
 
 
 def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, double_adjustment="max_plus3"):
