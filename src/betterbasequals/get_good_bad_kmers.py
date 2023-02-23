@@ -28,6 +28,8 @@ class MutationCounterWFilter:
         prefix="", 
         max_alt_frac = None,
         min_filter_count = 2,
+        min_filter_depth = 10,
+        max_filter_depth = 100,
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
@@ -54,6 +56,8 @@ class MutationCounterWFilter:
         self.radius = radius
         self.prefix = prefix
         self.min_filter_count = min_filter_count
+        self.min_filter_depth = min_filter_depth
+        self.max_filter_depth = max_filter_depth
 
     def __del__(self):
         self.tb.close()
@@ -87,7 +91,7 @@ class MutationCounterWFilter:
             max_depth = 1000000,
             min_mapping_quality = self.mapq,
             ignore_overlaps = False,
-            flag_require = 2,  # proper paired
+            flag_require = 0,  # No requirement
             flag_filter = 3848,
             min_base_quality = self.min_base_qual,
         )
@@ -109,8 +113,9 @@ class MutationCounterWFilter:
                 for pread in filter_pc.pileups:
                     pos = pread.query_position
                     if not pos is None:
-                        n_alleles.add(pread.alignment.query_sequence[pos])
-                    N_filter += 1
+                        n_alleles[pread.alignment.query_sequence[pos]] += 1
+                        N_filter += 1
+                
                 if N_filter < self.min_filter_depth or N_filter > self.max_filter_depth:
                     continue                
 
