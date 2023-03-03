@@ -17,15 +17,17 @@ def get_kmerpapa(super_pattern, contextD, opts):
     if opts.verbosity > 0:
         eprint(f'n_bad = {n_bad}, n_good = {n_good}, mean_error_rate = {my}')
     if n_bad<10:
-        assert n_good > 50, f'too few counts'
+        assert n_good > 10, f'too few counts'
         if opts.verbosity > 0:
             eprint('Skipping kmerpapa because of low number of bad kmers')
-        return {super_pattern: -10*log10((0.5+n_bad)/(0.5+n_good +n_bad))}
+        return {super_pattern: (0.01+n_bad, 1+n_good)}
+        #return {super_pattern: -10*log10((0.5+n_bad)/(0.5+n_good +n_bad))}
     if n_good<10:
-        assert n_bad > 50, f'too few counts'
+        assert n_bad > 10, f'too few counts'
         if opts.verbosity > 0:
             eprint('skipping kmerpapa because of low number of good kmers')
-        return {super_pattern: -10*log10((n_bad)/(0.5+n_good +n_bad))}
+        return {super_pattern: (0.01+n_bad, 1+n_good)}
+        #return {super_pattern: -10*log10((n_bad)/(0.5+n_good +n_bad))}
     if opts.kmerpapa_method == 'greedy':
         CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
         best_alpha, best_penalty, test_score = CV.get_best_a_c()
@@ -58,9 +60,10 @@ def get_kmerpapa(super_pattern, contextD, opts):
     for i in range(len(names)):
         pat = names[i]
         M, U = counts[i]
-        p = (M + best_alpha)/(M + U + best_alpha + best_beta)
+        #p = (M + best_alpha)/(M + U + best_alpha + best_beta)
         #eprint(pat, p)
-        D[pat] = -10*log10(p)
+        #D[pat] = -10*log10(p)
+        D[pat] = (M + best_alpha, U + best_beta) # alpha and beta in posterior beta distribution
         x += generality(pat)
     assert x == generality(super_pattern)
     return D

@@ -23,6 +23,11 @@ def p2phred(p):
 def phred2p(Q):
     return 10**(-Q/10)
 
+def empirical_bayes(a, b, x, N):
+    return (a+x)/(a+b+N)
+    #return p2phred(a+x) - p2phred(a+b+N)
+
+
 def get_average_coverage(bamfile):
     """Quickly calculates the average coverage of a WGS bamfile using the bam index.
     OBS: Only works for bam not cram!
@@ -239,29 +244,58 @@ def read_kmers(opts):
         bad_kmers[bqual][mtype][kmer] = int(count)
     return good_kmers, bad_kmers
 
+# def read_kmer_papas(opts):
+#     kmer_papas = {}
+#     for line in opts.input_file_kmerpapa:
+#         bqual, mtype, pattern, correction_factor = line.split()
+#         bqual=int(bqual)
+#         if bqual not in kmer_papas:
+#             kmer_papas[bqual] = {}
+#         if mtype not in kmer_papas[bqual]:
+#             kmer_papas[bqual][mtype] = {}
+#         for context in matches(pattern):
+#             kmer_papas[bqual][mtype][context] = float(correction_factor)
+#     return kmer_papas
+
+# def read_kmer_papas_for_test(opts):
+#     kmer_papas = {}
+#     for line in opts.input_file_kmerpapa:
+#         bqual, mtype, pattern, correction_factor = line.split()
+#         bqual=int(bqual)
+#         if bqual not in kmer_papas:
+#             kmer_papas[bqual] = {}
+#         if mtype not in kmer_papas[bqual]:
+#             kmer_papas[bqual][mtype] = {}
+#         kmer_papas[bqual][mtype][pattern] = float(correction_factor)
+#     return kmer_papas
+
 def read_kmer_papas(opts):
     kmer_papas = {}
     for line in opts.input_file_kmerpapa:
-        bqual, mtype, pattern, correction_factor = line.split()
+        bqual, mtype, pattern, alpha, beta = line.split()
+        alpha = float(alpha)
+        beta = float(beta)
         bqual=int(bqual)
         if bqual not in kmer_papas:
             kmer_papas[bqual] = {}
         if mtype not in kmer_papas[bqual]:
             kmer_papas[bqual][mtype] = {}
         for context in matches(pattern):
-            kmer_papas[bqual][mtype][context] = float(correction_factor)
+            kmer_papas[bqual][mtype][context] = (alpha, beta)
     return kmer_papas
 
 def read_kmer_papas_for_test(opts):
     kmer_papas = {}
     for line in opts.input_file_kmerpapa:
-        bqual, mtype, pattern, correction_factor = line.split()
+        bqual, mtype, pattern, alpha, beta = line.split()
+        alpha = float(alpha)
+        beta = float(beta)
         bqual=int(bqual)
         if bqual not in kmer_papas:
             kmer_papas[bqual] = {}
         if mtype not in kmer_papas[bqual]:
             kmer_papas[bqual][mtype] = {}
-        kmer_papas[bqual][mtype][pattern] = float(correction_factor)
+        kmer_papas[bqual][mtype][pattern] = p2phred(alpha/(alpha+beta))
     return kmer_papas
 
 

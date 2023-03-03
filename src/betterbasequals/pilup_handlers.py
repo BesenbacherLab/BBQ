@@ -198,7 +198,7 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
     return base_quals, n_ref, n_mismatch, n_double
 
 
-def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, double_adjustment="max_plus3"):
+def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, improve = 1, ignore_ref = False, double_adjustment="max_plus3"):
     """
     Returns a dictionary that maps from allele A to a list of tuples with probability of 
     observing Alt allele A given then read and probability of observing ref allele R given 
@@ -210,6 +210,9 @@ def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, do
     reads_mem = {}
     base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
     seen_alt = set()
+    n_mismatch = Counter()
+    n_double = Counter()
+    n_alt = Counter()
 
     #tmp: counting ref... can be removed later
     n_ref = 0
@@ -243,32 +246,64 @@ def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, do
                 X = read.allel
             
                 if X == R:
+                    if ignore_ref:
+                        continue
                     alts = [A for A in ['A','C','G','T'] if A!=R]
                 else:
                     alts = [X]
                     seen_alt.add(X)
 
                 for A in alts:
+                    n_double[A] += 1
+                    
                     muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
-                    adjusted_base_qual_from_A1 = correction_factor[read.base_qual][muttype_from_A][kmer_from_A]
-                    adjusted_base_qual_from_A2 = correction_factor[mem_read.base_qual][muttype_from_A][kmer_from_A]
+                    a1, b1 = correction_factor[read.base_qual][muttype_from_A][kmer_from_A]
+                    a2, b2 = correction_factor[mem_read.base_qual][muttype_from_A][kmer_from_A]
                     
-                    if double_adjustment == "mult":
-                        adjusted_base_qual_from_A = adjusted_base_qual_from_A1 + adjusted_base_qual_from_A2
-                    elif double_adjustment == "max_plus3":
-                        adjusted_base_qual_from_A = max(adjusted_base_qual_from_A1, adjusted_base_qual_from_A2) + 3
-
+                    if b1 is None:
+                        adjusted_base_qual_from_A = ((a1+a2)/(2*improve), None)
+                    else:
+                        adjusted_base_qual_from_A = (a1+a2, improve*(b1+b2))
+                    
                     muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-                    adjusted_base_qual_from_R1 = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
-                    adjusted_base_qual_from_R2 = correction_factor[mem_read.base_qual][muttype_from_R][kmer_from_R]
+                    a1, b1 = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
+                    a2, b2 = correction_factor[mem_read.base_qual][muttype_from_R][kmer_from_R]
                     
-                    if double_adjustment == "mult":
-                        adjusted_base_qual_from_R = adjusted_base_qual_from_R1 + adjusted_base_qual_from_R2
-                    elif double_adjustment == "max_plus3":
-                        adjusted_base_qual_from_R = max(adjusted_base_qual_from_R1, adjusted_base_qual_from_R2) + 3
-                        
-                    base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R))
+                    if b1 is None:
+                        adjusted_base_qual_from_R = ((a1+a2)/(2*improve), None)
+                    else:
+                        #print("double", a1, a2, b1, b2, muttype_from_R, kmer_from_R)
+                        adjusted_base_qual_from_R = (a1+a2, improve*(b1+b2))
+                    BQ = max(read.base_qual, mem_read.base_qual)
+                    if BQ > 35:
+                        n_alt[X] += 1
+                    base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R, BQ))
 
+                    # adjusted_base_qual_from_A1 = correction_factor[read.base_qual][muttype_from_A][kmer_from_A]
+                    # adjusted_base_qual_from_A2 = correction_factor[mem_read.base_qual][muttype_from_A][kmer_from_A]
+                    
+                    # if double_adjustment == "mult":
+                    #     adjusted_base_qual_from_A = adjusted_base_qual_from_A1 + adjusted_base_qual_from_A2
+                    # elif double_adjustment == "max_plus3":
+                    #     adjusted_base_qual_from_A = max(adjusted_base_qual_from_A1, adjusted_base_qual_from_A2) + 3
+
+                    # muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
+                    # adjusted_base_qual_from_R1 = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
+                    # adjusted_base_qual_from_R2 = correction_factor[mem_read.base_qual][muttype_from_R][kmer_from_R]
+                    
+                    # if double_adjustment == "mult":
+                    #     adjusted_base_qual_from_R = adjusted_base_qual_from_R1 + adjusted_base_qual_from_R2
+                    # elif double_adjustment == "max_plus3":
+                    #     adjusted_base_qual_from_R = max(adjusted_base_qual_from_R1, adjusted_base_qual_from_R2) + 3
+                        
+                    # base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R))
+            else: # Mismatch
+                if read.allel != ref:
+                    n_mismatch[read.allel] += 1
+                    n_double[read.allel] += 1
+                if mem_read.allel != ref:
+                    n_mismatch[mem_read.allel] += 1
+                    n_double[mem_read.allel] += 1
         else:            
             reads_mem[read.query_name] = read
 
@@ -281,6 +316,8 @@ def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, do
         else:
             alts = [X]
             seen_alt.add(X)
+            if read.base_qual > 35:
+                n_alt[X] += 1
         
         for A in alts:
             muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
@@ -289,10 +326,33 @@ def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, do
             muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
             adjusted_base_qual_from_R = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
             
-            base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R))
+            base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R, read.base_qual))
+    
+    posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
+    for A in base_probs:
+        for (from_A, from_R, BQ) in base_probs[A]:
+            a_from_A, b_from_A  = from_A
+            a_from_R, b_from_R  = from_R 
+            
+            ## TODO: Should I do bayesian update on both from_A and from_R
+            ## Or only on from_R ?????
 
-    return base_probs, seen_alt
+            ## should I also save alpha and beta for posterior? 
+            ## Or is it enough that I just save mean?
 
+            if b_from_A is None:
+                posterior_from_A = a_from_A
+            else:
+                posterior_from_A = (a_from_A + n_mismatch[A])/(a_from_A + b_from_A + n_double[A])
+
+            if b_from_R is None:
+                posterior_from_R = a_from_R
+            else:
+                posterior_from_R = (a_from_R + n_mismatch[A])/(a_from_R + b_from_R + n_double[A])
+
+            posterior_base_probs[A].append((posterior_from_A, posterior_from_R))
+
+    return base_probs, posterior_base_probs, seen_alt, n_mismatch, n_double, n_alt
 
 
 def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change_dict):

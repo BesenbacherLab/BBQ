@@ -214,13 +214,13 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
     kmer_papas = {}
 
     for bqual in bad_kmers:
+        radius = len(next(iter(good_kmers[bqual]["C->T"].keys())))//2
         kmer_papas[bqual] = {}
         eprint(f'Handling base_qual: {bqual}')
         for mtype in bad_kmers[bqual]:
             if mtype[0] == mtype[-1]:
                 continue
             eprint(f'Handling mutation type: {mtype}')
-            radius = len(next(iter(good_kmers[bqual]["A->C"].keys())))//2
             super_pattern = 'N'*radius + mtype[0] + 'N'*radius
             eprint(mtype, end=" ")
             if opts.correction_type == "bad_vs_good":
@@ -240,12 +240,13 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
             kpp = get_kmerpapa(super_pattern, contextD, opts)
             kmer_papas[bqual][mtype] = {}
             for pat in kpp:
+                alpha, beta = kpp[pat]
                 if not opts.output_file_kmerpapa is None:
-                    print(bqual, mtype, pat, kpp[pat], file=opts.output_file_kmerpapa)
+                    print(bqual, mtype, pat, alpha, beta, file=opts.output_file_kmerpapa)
                 if opts.verbosity > 1:
-                    eprint(bqual, mtype, pat, kpp[pat])
+                    eprint(bqual, mtype, pat, alpha, beta, -10*log10(alpha/(alpha+beta)))
                 for context in matches(pat):
-                    kmer_papas[bqual][mtype][context] = kpp[pat]
+                    kmer_papas[bqual][mtype][context] = (alpha, beta)
     
     if not opts.output_file_kmerpapa is None:
         opts.output_file_kmerpapa.close()
@@ -312,7 +313,10 @@ def run_call(opts, kmer_papas):
     
 
 
-
+def get_phred(tup):
+    alpha, beta = tup
+    return -10*log10(alpha /(alpha+beta))
+ 
 def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
     for bqual in kmer_papas:
         for mtype in kmer_papas[bqual]:
@@ -341,7 +345,7 @@ def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
                     phred = -10*log10(n_bad / (n_bad + n_good))
                 else:
                     phred = 0
-                print(bqual, mtype, pat, kmer_papas[bqual][mtype][pat], n_bad, n_good, phred)
+                print(bqual, mtype, pat, get_phred(kmer_papas[bqual][mtype][pat]), n_bad, n_good, phred)
 
 
 def main(args = None):

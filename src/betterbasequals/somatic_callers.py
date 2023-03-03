@@ -13,7 +13,7 @@ def get_LR(base_probs):
     # It is ok that I use phred scales insted of the usual natural log.
     # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
     def p_data_given_mut(alpha):
-        return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
+        return sum(p2phred(alpha * p_a2x + (1-alpha)*p_r2x) for p_a2x, p_r2x in base_probs)
         
         #Maybe we can weigh the read prob using the mapping quality
         #return sum(p2phred((1-p_map_error)*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) +p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
@@ -82,8 +82,10 @@ class SomaticMutationCaller:
                         p = 1.0
                         for change_type in change_types:
                             #TODO: should we use log-sum-exp function for numerical stability?
-                            p -= phred2p(self.mut_probs[BQ][change_type][kmer])
-                        self.mut_probs[BQ][stay_type][kmer] = p2phred(p)
+                            #p -= phred2p(self.mut_probs[BQ][change_type][kmer])
+                            alpha,beta = self.mut_probs[BQ][change_type][kmer]
+                            p -= alpha/(alpha+beta)
+                        self.mut_probs[BQ][stay_type][kmer] = (p, None)
 
         self.cutoff = cutoff
         self.mapq = mapq
