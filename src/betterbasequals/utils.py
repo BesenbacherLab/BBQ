@@ -236,6 +236,8 @@ def read_kmers(opts):
     bad_kmers = {}
     for line in opts.input_file_bad:
         bqual, mtype, kmer, count = line.split()
+        if count == "0":
+            continue
         bqual = int(bqual)
         if bqual not in bad_kmers:
             bad_kmers[bqual] = {}
