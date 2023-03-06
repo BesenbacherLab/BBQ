@@ -156,7 +156,7 @@ class MutationValidator:
                 BQ = error_prob[2]
                 posterior = p2phred(posterior_error_prob[1])
                 seen_hifi = sum(1 for x in hifi_basequals[A] if x>80) > 0
-                print(BQ, int(prior), int(posterior), int(seen_hifi), n_mismatch[A], all_mismatch, n_double[A], n_alt[A])
+                print(BQ, alpha, beta, int(seen_hifi), n_mismatch[A], all_mismatch, n_double[A], n_alt[A])
 
     #             # Variant quality
     #             #corr_var_qual = sum(x[0] for x in corrected_base_quals[A])
