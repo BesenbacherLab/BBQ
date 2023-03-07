@@ -115,7 +115,6 @@ class MutationCounterWFilter:
                     if not pos is None:
                         n_alleles[pread.alignment.query_sequence[pos]] += 1
                         N_filter += 1
-                
                 if N_filter < self.min_filter_depth or N_filter > self.max_filter_depth:
                     continue                
 
@@ -126,7 +125,7 @@ class MutationCounterWFilter:
                     if second[1] >= self.min_filter_count:
                         continue
                 else:
-                    major = n_alleles.most_common(1)
+                    major = n_alleles.most_common(1)[0]
 
                 self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, major[0])
         else:
@@ -202,7 +201,6 @@ class MutationCounterWFilter:
                         has_good.add(read.allel)
 
                 else:
-                    #Are ignoring ref alleles pt... should adjust later
 
                     if read.allel != ref:
                         event_list.append(('bad', read.allel, read.base_qual))
@@ -229,8 +227,9 @@ class MutationCounterWFilter:
             if second[1]/N >= self.max_alt_frac:
                 return
         elif len(n_alleles) == 1:
-            major = n_alleles.most_common(1)
+            major = n_alleles.most_common(1)[0]
         else:
+            eprint('error!!!!!!')
             return
 
         #If the major allele is no the ref allele we ignore the site.
