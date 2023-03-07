@@ -229,27 +229,19 @@ class MutationCounterWFilter:
         elif len(n_alleles) == 1:
             major = n_alleles.most_common(1)[0]
         else:
-            eprint('error!!!!!!')
+            #We require that we see a good quality allele at the site
             return
 
-        #If the major allele is no the ref allele we ignore the site.
+        #If the major allele is not the ref allele we ignore the site.
         if major[0] != ref:
             return
 
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
+
             if event_type == 'good':
-                #if ref != allele or len(has_good) == 1:
                 good_kmers[(base_qual, mut_type, kmer)] += 1
 
             elif event_type == 'bad':
-                #OBS: Have commented this out. 2023.02.02
-                # Isince it would create a bias to have a filter on bad sites that
-                # is not applied to good sites. 
-                # We do not considder bad variants at sites where
-                #if (allele not in has_good and 
-                #    (n_allele[allele]/N) < self.max_bad_frac):
-                # 
-                #if len(has_good) == 1:
                 bad_kmers[(base_qual, mut_type, kmer)] += 1
 
