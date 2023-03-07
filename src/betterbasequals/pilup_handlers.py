@@ -416,7 +416,7 @@ def get_validation_probabities(pileupcolumn, ref, ref_kmer, correction_factor, i
                 BQ = max(read.base_qual, mem_read.base_qual)
 
                 if BQ > 35:
-                    n_alt[X] += 1
+                    n_alt[A] += 1
 
                 base_probs[A].append((alpha, beta, BQ, muttype_from_R, 1))
 
@@ -439,7 +439,7 @@ def get_validation_probabities(pileupcolumn, ref, ref_kmer, correction_factor, i
 
         seen_alt.add(A)
         if read.base_qual > 35:
-            n_alt[X] += 1
+            n_alt[A] += 1
 
         muttype_from_R, kmer_from_R = mut_type(R, A, ref_kmer)
         alpha, beta = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
