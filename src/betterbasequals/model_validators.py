@@ -1,6 +1,6 @@
 import py2bit
 from betterbasequals.utils import p2phred, eprint, reverse_complement, Read, zip_pileups_single_chrom, open_bam_w_index
-from betterbasequals.pilup_handlers import get_pileup_count, get_alleles_w_quals, get_alleles_w_probabities
+from betterbasequals.pilup_handlers import get_pileup_count, get_alleles_w_quals, get_validation_probabities
 from collections import Counter
 
 class MutationValidator:
@@ -140,23 +140,16 @@ class MutationValidator:
             
         if n_hifi_reads > 100:
             return
+
+        base_probs, seen_alts, n_mismatch, n_double, n_alt = get_validation_probabities(pileupcolumn, ref, kmer, self.mut_probs)
         
-        base_probs, posterior_probs, seen_alts, n_mismatch, n_double, n_alt = get_alleles_w_probabities(pileupcolumn, ref, kmer, self.mut_probs, ignore_ref = True)
-        #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
         all_mismatch = sum(n_mismatch.values())
         for A in seen_alts:
-            for error_prob, posterior_error_prob in zip(base_probs[A], posterior_probs[A]):
-                #print(posterior_error_prob)
-                #print(error_prob)
-                if posterior_error_prob[0] < posterior_error_prob[1]:
-                    #The observed allele is a ref
+            seen_hifi = sum(1 for x in hifi_basequals[A] if x>80) > 0
+            for alpha, beta, BQ, muttype, atype in base_probs[A]:
+                if n_alt[A]>5:
                     continue
-                alpha, beta = error_prob[1]
-                prior = p2phred(alpha/(alpha+beta))
-                BQ = error_prob[2]
-                posterior = p2phred(posterior_error_prob[1])
-                seen_hifi = sum(1 for x in hifi_basequals[A] if x>80) > 0
-                print(BQ, alpha, beta, int(seen_hifi), n_mismatch[A], all_mismatch, n_double[A], n_alt[A])
+                print(BQ, alpha, beta, muttype, atype, int(seen_hifi), n_mismatch[A], all_mismatch, n_double[A], n_alt[A])
 
     #             # Variant quality
     #             #corr_var_qual = sum(x[0] for x in corrected_base_quals[A])

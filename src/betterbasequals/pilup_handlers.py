@@ -355,6 +355,108 @@ def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, im
     return base_probs, posterior_base_probs, seen_alt, n_mismatch, n_double, n_alt
 
 
+def get_validation_probabities(pileupcolumn, ref, ref_kmer, correction_factor, improve = 1, ignore_ref = False, double_adjustment="max_plus3"):
+    """
+    
+    """
+
+    reads_mem = {}
+    base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
+    seen_alt = set()
+    n_mismatch = Counter()
+    n_double = Counter()
+    n_alt = Counter()
+
+    #tmp: counting ref... can be removed later
+    n_ref = 0
+    R = ref
+    for pileup_read in pileupcolumn.pileups:
+        # test for deletion at pileup
+        if pileup_read.is_del or pileup_read.is_refskip:
+            continue
+        #TODO: should consider what the right solution is if there is deletion at overlap
+
+        # fetch read information
+        read = Read(pileup_read)
+
+        # test if read is okay
+        if (
+            read.allel not in "ATGC"
+            or read.start is None
+            or read.end is None
+            #or read.NH != 1
+        ):
+            continue
+
+
+        # Look for read partner
+        if read.query_name in reads_mem:
+            # found partner process read pair
+            mem_read = reads_mem.pop(read.query_name)
+
+            # We do not trust mismathces in overlaps so we only handle matches
+            if read.allel == mem_read.allel:
+                A = read.allel
+                
+                if A == R:
+                    for X in [x for x in 'ACGT' if x != R]:
+                        n_double[X] += 1
+                    continue
+                else:
+                    n_double[A] += 1
+                seen_alt.add(A)
+
+                muttype_from_R, kmer_from_R = mut_type(R, A, ref_kmer)
+                a1, b1 = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
+                a2, b2 = correction_factor[mem_read.base_qual][muttype_from_R][kmer_from_R]
+                
+                alpha = a1+a2
+                beta = b1+b2
+                
+                BQ = max(read.base_qual, mem_read.base_qual)
+
+                if BQ > 35:
+                    n_alt[X] += 1
+
+                base_probs[A].append((alpha, beta, BQ, muttype_from_R, 1))
+
+            else: # Mismatch
+                if read.allel != ref:
+                    n_mismatch[read.allel] += 1
+                    n_double[read.allel] += 1
+                if mem_read.allel != ref:
+                    n_mismatch[mem_read.allel] += 1
+                    n_double[mem_read.allel] += 1
+        else:            
+            reads_mem[read.query_name] = read
+
+    # Handle reads without partner (ie. no overlap)
+    for read in reads_mem.values():
+        A = read.allel
+                
+        if A == R:
+            continue
+
+        seen_alt.add(A)
+        if read.base_qual > 35:
+            n_alt[X] += 1
+
+        muttype_from_R, kmer_from_R = mut_type(R, A, ref_kmer)
+        alpha, beta = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
+        BQ = read.base_qual
+        base_probs[A].append((alpha, beta, BQ, muttype_from_R, 2))
+    
+    #final_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
+    #for A in base_probs:
+    #    for alpha, beta, BQ, muttype, atype in base_probs[A]:        
+    #        final_base_probs[A].append((alpha, beta, BQ, muttype, atype, n_mismatch[A], n_))
+
+    return base_probs, seen_alt, n_mismatch, n_double, n_alt
+
+
+
+
+
 def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change_dict):
     reads_mem = {}
 

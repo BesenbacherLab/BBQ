@@ -211,6 +211,7 @@ class MutationCounterWFilter:
                         event_list.append(('bad', mem_read.allel, mem_read.base_qual))
             else:            
                 reads_mem[read.query_name] = read
+
         if coverage < self.min_depth or coverage > self.max_depth:
             return
         
@@ -235,7 +236,6 @@ class MutationCounterWFilter:
         #If the major allele is no the ref allele we ignore the site.
         if major[0] != ref:
             return
-
 
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
