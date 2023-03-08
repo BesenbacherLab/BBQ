@@ -407,14 +407,12 @@ def get_validation_probabities(pileupcolumn, ref, ref_kmer, correction_factor, i
                 seen_alt.add(A)
 
                 muttype_from_R, kmer_from_R = mut_type(R, A, ref_kmer)
-                a1, b1 = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
-                a2, b2 = correction_factor[mem_read.base_qual][muttype_from_R][kmer_from_R]
                 
-                alpha = a1+a2
-                beta = b1+b2
-                
+
                 BQ = max(read.base_qual, mem_read.base_qual)
 
+                alpha, beta = correction_factor[BQ][muttype_from_R][kmer_from_R]                
+                
                 if BQ > 35:
                     n_alt[A] += 1
 
