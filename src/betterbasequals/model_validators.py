@@ -50,8 +50,8 @@ class MutationValidator:
         #         p = kmer_papa[mtype][kmer]
         #         self.correction_factor[mtype][kmer] = -10*log10(p/(1-p))
         
-        self.min_filter_depth = 25
-        self.max_filter_depth = 55
+        self.min_filter_depth = 10 #25
+        self.max_filter_depth = 100 #55
 
 
     def __del__(self):
@@ -145,7 +145,7 @@ class MutationValidator:
         
         all_mismatch = sum(n_mismatch.values())
         for A in seen_alts:
-            seen_hifi = sum(1 for x in hifi_basequals[A] if x>80) > 0
+            seen_hifi = sum(1 for x in hifi_basequals[A] if x>30) > 4
             for alpha, beta, BQ, muttype, atype in base_probs[A]:
                 if n_alt[A]>5:
                     continue
