@@ -145,6 +145,8 @@ class MutationValidator:
         
         all_mismatch = sum(n_mismatch.values())
         for A in seen_alts:
+            if A in filter_alleles:
+                continue
             seen_hifi = sum(1 for x in hifi_basequals[A] if x>30) > 4
             for alpha, beta, BQ, muttype, atype in base_probs[A]:
                 if n_alt[A]>5:
