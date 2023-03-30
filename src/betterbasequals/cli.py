@@ -253,6 +253,13 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
     
     return kmer_papas
 
+def phred_scale_kmerpapas(kmer_papas):
+    for bqual in kmer_papas:
+        for mtype in kmer_papas[bqual]:
+            for context in kmer_papas[mtype][bqual]:
+                alpha, beta = kmer_papas[bqual][mtype][context]
+                kmer_papas[bqual][mtype][context] = -10*log10(alpha/(alpha+beta))
+
 def run_validation(opts, kmer_papas):
     if opts.verbosity > 0:
         eprint("Printing validation data")
@@ -271,6 +278,7 @@ def run_validation(opts, kmer_papas):
 def run_adjust(opts, kmer_papas):
     if opts.verbosity > 0:
         eprint("Adjusting base qualities")
+    phred_scale_kmerpapas(kmer_papas)
     adjuster = \
         BaseAdjuster(
             opts.bam_file,
