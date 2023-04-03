@@ -1,7 +1,7 @@
 import py2bit
 from scipy.optimize import minimize_scalar
 from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred
-from betterbasequals.pilup_handlers import get_alleles_w_probabities
+from betterbasequals.pilup_handlers import get_alleles_w_probabities_update
 from collections import Counter
 import scipy.stats
 
@@ -13,7 +13,10 @@ def get_LR(base_probs):
     # It is ok that I use phred scales insted of the usual natural log.
     # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
     def p_data_given_mut(alpha):
-        return sum(p2phred(alpha * p_a2x + (1-alpha)*p_r2x) for p_a2x, p_r2x in base_probs)
+        return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
+        
+        # If probabilities in base_probs are not phred scaled. It becomes this:
+        #return sum(p2phred(alpha * p_a2x + (1-alpha)*p_r2x) for p_a2x, p_r2x in base_probs)
         
         #Maybe we can weigh the read prob using the mapping quality
         #return sum(p2phred((1-p_map_error)*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) +p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
@@ -47,6 +50,9 @@ class SomaticMutationCaller:
         outfile,
         method,
         cutoff,
+        prior_N,
+        no_update,
+        double_adjustment,
         mapq = 50,
         min_base_qual = 1,
         filter_mapq = 20,
@@ -72,22 +78,26 @@ class SomaticMutationCaller:
         self.outfile = outfile
         self.method = method
 
-        if self.method == 'LR':
+        #This should be handled in pileup code now.
+        #if self.method == 'LR':
             # make sure that all X->X are also in kmerpapa
-            mtype_tups = ('C->C', ('C->A', 'C->G', 'C->T')), ('A->A', ('A->C', 'A->G', 'A->T'))
-            for BQ in self.mut_probs:
-                for stay_type, change_types in mtype_tups:
-                    self.mut_probs[BQ][stay_type] = {}
-                    for kmer in self.mut_probs[BQ][change_types[0]]:
-                        p = 1.0
-                        for change_type in change_types:
-                            #TODO: should we use log-sum-exp function for numerical stability?
-                            #p -= phred2p(self.mut_probs[BQ][change_type][kmer])
-                            alpha,beta = self.mut_probs[BQ][change_type][kmer]
-                            p -= alpha/(alpha+beta)
-                        self.mut_probs[BQ][stay_type][kmer] = (p, None)
+            # mtype_tups = ('C->C', ('C->A', 'C->G', 'C->T')), ('A->A', ('A->C', 'A->G', 'A->T'))
+            # for BQ in self.mut_probs:
+            #     for stay_type, change_types in mtype_tups:
+            #         self.mut_probs[BQ][stay_type] = {}
+            #         for kmer in self.mut_probs[BQ][change_types[0]]:
+            #             p = 1.0
+            #             for change_type in change_types:
+            #                 #TODO: should we use log-sum-exp function for numerical stability?
+            #                 #p -= phred2p(self.mut_probs[BQ][change_type][kmer])
+            #                 alpha,beta = self.mut_probs[BQ][change_type][kmer]
+            #                 p -= alpha/(alpha+beta)
+            #             self.mut_probs[BQ][stay_type][kmer] = (p, None)
 
         self.cutoff = cutoff
+        self.prior_N = prior_N
+        self.no_update = no_update
+        self.double_adjustment = double_adjustment
         self.mapq = mapq
         self.min_base_qual = min_base_qual
         self.filter_mapq = filter_mapq
@@ -191,9 +201,9 @@ class SomaticMutationCaller:
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
         elif self.method == 'LR':
-            base_probs, seen_alts = get_alleles_w_probabities(pileupcolumn, ref, kmer, self.mut_probs)
+            base_probs = get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
-            for A in seen_alts:
+            for A in base_probs:
                 if A in filter_alleles:
                     continue
                 LR, N, N_A, AF = get_LR(base_probs[A])

@@ -105,6 +105,12 @@ def get_parser():
         help="Method used to calculate variant quality scores")
     call_parent.add_argument('--cutoff', type=float, default=0.001,
         help="initial variant calling p-value cutoff")
+    call_parent.add_argument('--prior_N', type=float, default=100,
+        help="Weight (as sample size) of the kmer based prior on error rate.")
+    call_parent.add_argument('--no_update',  action='store_true',
+        help="Do not make bayesian update of error rate but use rate only estimated from kmers")
+    call_parent.add_argument('--double_adjustment', type=float, default=0.5,
+        help="How much lower should the error rate be if we see a matching overlap.")
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -256,10 +262,10 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
 def phred_scale_kmerpapas(kmer_papas):
     for bqual in kmer_papas:
         for mtype in kmer_papas[bqual]:
-            for context in kmer_papas[mtype][bqual]:
+            for context in kmer_papas[bqual][mtype]:
                 alpha, beta = kmer_papas[bqual][mtype][context]
                 kmer_papas[bqual][mtype][context] = -10*log10(alpha/(alpha+beta))
-
+    
 def run_validation(opts, kmer_papas):
     if opts.verbosity > 0:
         eprint("Printing validation data")
@@ -310,6 +316,9 @@ def run_call(opts, kmer_papas):
             opts.outfile,
             opts.method,
             opts.cutoff,
+            opts.prior_N,
+            opts.no_update,
+            opts.double_adjustment
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()
@@ -319,7 +328,6 @@ def run_call(opts, kmer_papas):
     if opts.verbosity > 0:
         eprint(f'Found {n_calls} variants with a p-value less than {opts.cutoff}.')
     
-
 
 def get_phred(tup):
     alpha, beta = tup
