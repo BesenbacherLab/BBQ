@@ -201,7 +201,7 @@ class SomaticMutationCaller:
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
         elif self.method == 'LR':
-            base_probs = get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment)
+            base_probs, BQs = get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
             for A in base_probs:
                 if A in filter_alleles:
@@ -210,8 +210,10 @@ class SomaticMutationCaller:
                 # make LR into p-value
                 p_val = scipy.stats.chi2.sf(-2*LR, 2)
                 if p_val < self.cutoff:
+                    oldBQ = [x[0] for x in BQs[A]]
+                    newBQ = '[' +','.join(f'{x[1]:.1f}' for x in BQs[A]) + ']'
                     n_calls += 1
-                    print(f'{chrom}\t{ref_pos+1}\t{ref}\t{A}\tpval={p_val};LR={LR};AF={AF};N={N};N_A={N_A}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t{ref}\t{A}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ};newBQ={newBQ}', file=self.outfile)
 
         return n_calls
 

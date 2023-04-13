@@ -510,8 +510,6 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     n_alt = Counter()
     events = {'A':[], 'C':[], 'G':[], 'T':[]}
 
-    #tmp: counting ref... can be removed later
-    n_ref = 0
     R = ref
     for pileup_read in pileupcolumn.pileups:
         # test for deletion at pileup
@@ -537,7 +535,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
             # found partner process read pair
             mem_read = reads_mem.pop(read.query_name)
 
-            # We do not trust mismathces in overlaps so we only handle matches
+            # We do not trust mismathces in overlaps so we only add to events list in case of match
             if read.allel == mem_read.allel:
                 X = read.allel
             
@@ -555,6 +553,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
 
             else: # Mismatch
                 if not no_update:
+                    # TODO: Would it make sense to also count ref_mismatches so that we could
+                    # do bayesian update of A->R error rates and not only R->A error rates?
                     if read.allel != ref:
                         n_mismatch[read.allel] += 1
                         n_double[read.allel] += 1
@@ -573,8 +573,6 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         else:
             alts = [X]
             seen_alt.add(X)
-            if read.base_qual > 35:
-                n_alt[X] += 1
         
         for A in alts:
             events[A].append(("single", X, read.base_qual, None))
@@ -617,6 +615,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
             new_correction_factor[BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
 
     posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
+    BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
     for A in seen_alt:
         for overlap_type, X, read_BQ, other_read_BQ in events[A]:
             muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
@@ -629,8 +628,10 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
             posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
 
             posterior_base_probs[A].append((posterior_from_A, posterior_from_R))
+            if A==X:
+                BQs[A].append((read_BQ, posterior_from_R))
                     
-    return posterior_base_probs
+    return posterior_base_probs, BQs
 
 
 
