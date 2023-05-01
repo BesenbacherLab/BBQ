@@ -555,12 +555,18 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 if not no_update:
                     # TODO: Would it make sense to also count ref_mismatches so that we could
                     # do bayesian update of A->R error rates and not only R->A error rates?
-                    if read.allel != ref:
+                    if read.allel != ref and mem_read.allel == ref:
                         n_mismatch[read.allel] += 1
-                        n_double[read.allel] += 1
-                    if mem_read.allel != ref:
+                        for A in ['A','C','G','T']:
+                            if A == ref:
+                                continue
+                            n_double[A] += 1
+                    if mem_read.allel != ref and read.allel == ref:
                         n_mismatch[mem_read.allel] += 1
-                        n_double[mem_read.allel] += 1
+                        for A in ['A','C','G','T']:
+                            if A == ref:
+                                continue
+                            n_double[A] += 1
         else:            
             reads_mem[read.query_name] = read
 
@@ -587,7 +593,6 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         new_correction_factor[BQ]["single"] = defaultdict(dict)
         new_correction_factor[BQ]["double"] = defaultdict(dict)
 
-
         for from_base in relevant_bases:
             p_rest = 1.0
             p_rest_double = 1.0
@@ -596,21 +601,23 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 if to_base == from_base:
                     continue
                 change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                alpha,beta = correction_factor[BQ][change_type][change_kmer]
+                alpha, beta = correction_factor[BQ][change_type][change_kmer]
                 p_prior = alpha/(alpha+beta)
                 a = p_prior * prior_N
                 b = prior_N - a
                 p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                 p_rest -= p_posterior
+                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                 new_correction_factor[BQ]["single"][change_type][change_kmer] = p2phred(p_posterior)
 
                 p_prior_double = p_prior * double_adjustment
                 a = p_prior_double * prior_N
                 b = prior_N - a
                 p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                 p_rest_double -= p_posterior
                 new_correction_factor[BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
-
+            
             new_correction_factor[BQ]["single"][stay_type][stay_kmer] = p2phred(p_rest)
             new_correction_factor[BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
 
