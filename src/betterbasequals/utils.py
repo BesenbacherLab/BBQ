@@ -203,6 +203,22 @@ def zip_pileups_single_chrom(*pileups):
             break
 
 
+def read_variant_set(variant_file):
+    f = open(variant_file)
+    S = set()
+    for line in f:
+        chrom, pos, allele = line.split()
+        S.add((chrom, int(pos), allele))
+    return S
+    #chrom2set = {}
+    #for line in f:
+    #    chrom, pos, allele = line.split()
+    #    if chrom not in chrom2set:
+    #        chrom2set[chrom] = set()
+    #        chrom2set[chrom].add((int(pos), allele))
+    #return chrom2set
+
+
 def open_bam_w_index(bam_file):
     """Check if bam index exists, if not create an index file.
     Then open and return pysam.AlignmentFile.

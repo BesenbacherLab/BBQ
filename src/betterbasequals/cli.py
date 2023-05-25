@@ -2,7 +2,7 @@
 
 import argparse
 from betterbasequals.get_good_bad_kmers import MutationCounterWFilter
-from betterbasequals.model_validators import MutationValidator
+from betterbasequals.model_validators import MutationValidator, ListMutationValidator
 from betterbasequals.bam_adjusters import BaseAdjuster
 from betterbasequals.somatic_callers import SomaticMutationCaller
 from betterbasequals.utils import *
@@ -88,6 +88,11 @@ def get_parser():
     validate_parent = argparse.ArgumentParser(add_help=False)
     validate_parent.add_argument("--validation_bam_file", help="hifi bam file", required=True)
 
+    # args for validating models:    
+    list_validate_parent = argparse.ArgumentParser(add_help=False)
+    list_validate_parent.add_argument("--validation_list_file", help="file with list of true variants", required=True)
+
+
     # args for printing polished bam:    
     adjust_parent = argparse.ArgumentParser(add_help=False)
     adjust_parent.add_argument('--outbam', type=str,
@@ -128,6 +133,12 @@ def get_parser():
         help = 'First run "count" and "train" then print validation data',
         parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent])
 
+    list_validate_parser = subparsers.add_parser('list_validate', 
+        description = 'First run "count" and "train" then print validation data',
+        help = 'First run "count" and "train" then print validation data',
+        parents=[bam_parent, filter_parent, count_parent, train_parent, list_validate_parent])
+
+
     adjust_parser = subparsers.add_parser('adjust', 
         description = 'First run "count" and "train" then output bam with adjusted base qualities.', 
         help = 'First run "count" and "train" then output bam with adjusted base qualities.', 
@@ -150,7 +161,14 @@ def get_parser():
         help = 'Print validation data.', 
         parents = [bam_parent, filter_parent, validate_parent]) 
     validate_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
-    
+
+    list_validate_only_parser = subparsers.add_parser('list_validate_only', 
+        description = 'Print validation data.',
+        help = 'Print validation data.', 
+        parents = [bam_parent, filter_parent, list_validate_parent]) 
+    list_validate_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
+
+
     adjust_only_parser = subparsers.add_parser('adjust_only', 
         description = 'Output bam with adjusted base qualities.', 
         help = 'Output bam with adjusted base qualities.',
@@ -281,6 +299,23 @@ def run_validation(opts, kmer_papas):
     else:
         validator.call_mutations(opts.chrom, opts.start, opts.end)
 
+def run_list_validation(opts, kmer_papas):
+    if opts.verbosity > 0:
+        eprint("Printing validation data")
+    validator = \
+        ListMutationValidator(
+            opts.bam_file, 
+            opts.filter_bam_file, 
+            opts.validation_list_file, 
+            opts.twobit_file, 
+            kmer_papas)
+    if opts.chrom is None:
+        validator.call_all_chroms()
+    else:
+        validator.call_mutations(opts.chrom, opts.start, opts.end)
+
+
+
 def run_adjust(opts, kmer_papas):
     if opts.verbosity > 0:
         eprint("Adjusting base qualities")
@@ -386,7 +421,7 @@ def main(args = None):
         parser.print_help(sys.stderr)
         return 1
 
-    if not opts.command in ['train_only', 'validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
+    if not opts.command in ['train_only', 'validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
         good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command in ['train_only', 'test_kmerpapa']:
         good_kmers, bad_kmers = read_kmers(opts)
@@ -394,7 +429,7 @@ def main(args = None):
     if opts.command == 'count':
         return 0
 
-    if not opts.command in ['validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
+    if not opts.command in ['validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
         kmer_papas = run_get_kmerpapas(opts, good_kmers, bad_kmers)
     elif opts.command in "test_kmerpapa":
         kmer_papas = read_kmer_papas_for_test(opts)
@@ -407,6 +442,8 @@ def main(args = None):
 
     if opts.command in ['validate', 'validate_only']:
         run_validation(opts, kmer_papas)
+    elif opts.command in ['list_validate', 'list_validate_only']:
+        run_list_validation(opts, kmer_papas)
     elif opts.command in ['call', 'call_only']:
         run_call(opts, kmer_papas)
     elif opts.command in ['adjust', 'adjust_only']:
