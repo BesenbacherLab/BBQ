@@ -443,8 +443,8 @@ class ListMutationValidator:
         #print(len(base_probs), len(seen_alts))
         all_mismatch = sum(n_mismatch.values())
         for A in seen_alts:
-            seen_validation = (chrom, ref_pos, A) in self.validation_set
+            seen_validation = (chrom, ref_pos+1, A) in self.validation_set
             for alpha, beta, BQ, muttype, atype in base_probs[A]:
-                if n_alt[A]>5:
-                    continue
+                #if n_alt[A]>5:
+                #    continue
                 print(BQ, alpha, beta, muttype, atype, int(seen_validation), n_mismatch[A], all_mismatch, n_double[A], n_alt[A])
