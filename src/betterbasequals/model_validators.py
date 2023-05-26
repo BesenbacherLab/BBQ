@@ -1,6 +1,7 @@
 import py2bit
 from betterbasequals.utils import p2phred, eprint, reverse_complement, Read, zip_pileups_single_chrom, open_bam_w_index, read_variant_set
-from betterbasequals.pilup_handlers import get_pileup_count, get_alleles_w_quals, get_validation_probabities
+from betterbasequals.pilup_handlers import get_pileup_count, get_alleles_w_quals, get_validation_probabities, get_alleles_w_probabities_update_ver2
+
 from collections import Counter
 
 class MutationValidator:
@@ -338,18 +339,18 @@ class ListMutationValidator:
 
         #assumes that the kmer papa has been turned into phred scaled correction factor
         self.mut_probs = kmer_papa
-        mtype_tups = ('C->C', ('C->A', 'C->G', 'C->T')), ('A->A', ('A->C', 'A->G', 'A->T'))
-        for BQ in self.mut_probs:
-            for stay_type, change_types in mtype_tups:
-                self.mut_probs[BQ][stay_type] = {}
-                for kmer in self.mut_probs[BQ][change_types[0]]:
-                    p = 1.0
-                    for change_type in change_types:
-                        #TODO: should we use log-sum-exp function for numerical stability?
-                        #p -= phred2p(self.mut_probs[BQ][change_type][kmer])
-                        alpha,beta = self.mut_probs[BQ][change_type][kmer]
-                        p -= alpha/(alpha+beta)
-                    self.mut_probs[BQ][stay_type][kmer] = (p, None)
+        # mtype_tups = ('C->C', ('C->A', 'C->G', 'C->T')), ('A->A', ('A->C', 'A->G', 'A->T'))
+        # for BQ in self.mut_probs:
+        #     for stay_type, change_types in mtype_tups:
+        #         self.mut_probs[BQ][stay_type] = {}
+        #         for kmer in self.mut_probs[BQ][change_types[0]]:
+        #             p = 1.0
+        #             for change_type in change_types:
+        #                 #TODO: should we use log-sum-exp function for numerical stability?
+        #                 #p -= phred2p(self.mut_probs[BQ][change_type][kmer])
+        #                 alpha,beta = self.mut_probs[BQ][change_type][kmer]
+        #                 p -= alpha/(alpha+beta)
+        #             self.mut_probs[BQ][stay_type][kmer] = (p, None)
 
 
         # Create correction factor dict:
@@ -438,13 +439,21 @@ class ListMutationValidator:
         if not filter_alleles is None and ref not in filter_alleles:
             return 
 
-        base_probs, seen_alts, n_mismatch, n_double, n_alt = get_validation_probabities(pileupcolumn, ref, kmer, self.mut_probs)
         
-        #print(len(base_probs), len(seen_alts))
-        all_mismatch = sum(n_mismatch.values())
-        for A in seen_alts:
+        base_probs, n_mismatch, n_double, n_mismatch_BQ, n_double_BQ = get_alleles_w_probabities_update_ver2(pileupcolumn, ref, kmer, self.mut_probs, 100, True, 0.5)
+        for A in base_probs:
             seen_validation = (chrom, ref_pos+1, A) in self.validation_set
-            for alpha, beta, BQ, muttype, atype in base_probs[A]:
-                #if n_alt[A]>5:
-                #    continue
-                print(BQ, alpha, beta, muttype, atype, int(seen_validation), n_mismatch[A], all_mismatch, n_double[A], n_alt[A])
+            N_A = sum(oldBQ > 30 for newBQ, MQ, oldBQ in base_probs[A])#sum(1 for x,y,_ in base_probs[A] if x<y)
+            for newBQ, MQ, oldBQ in base_probs[A]:            
+                print(oldBQ, int(newBQ), int(seen_validation), n_mismatch[A], n_double[A], n_mismatch_BQ[A][oldBQ], n_double_BQ[A][oldBQ], N_A, int(MQ))
+
+
+        # base_probs, seen_alts, n_mismatch, n_double, n_alt = get_validation_probabities(pileupcolumn, ref, kmer, self.mut_probs)    
+        # #print(len(base_probs), len(seen_alts))
+        # all_mismatch = sum(n_mismatch.values())
+        # for A in seen_alts:
+        #     seen_validation = (chrom, ref_pos+1, A) in self.validation_set
+        #     for alpha, beta, BQ, muttype, atype in base_probs[A]:
+        #         #if n_alt[A]>5:
+        #         #    continue
+        #         print(BQ, alpha, beta, muttype, atype, int(seen_validation), n_mismatch[A], all_mismatch, n_double[A], n_alt[A])

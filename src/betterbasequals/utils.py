@@ -130,6 +130,7 @@ class Read:
         self.query_name = pileup_read.alignment.query_name
         self.length = abs(pileup_read.alignment.template_length)
         self.isR1 = pileup_read.alignment.is_read1
+        self.mapq = pileup_read.alignment.mapping_quality
         #self.NH = pileup_read.alignment.get_tag("NH")
 
         # Process cigar stats
