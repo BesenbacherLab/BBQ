@@ -165,6 +165,7 @@ class SomaticMutationCaller:
         self.max_depth = max_depth
         self.radius = radius
         self.prefix = prefix
+        self.filter = False
 
         #TODO: filter_depth variable should be set based on average coverage in filter file.
         self.min_filter_depth = 10
@@ -260,19 +261,67 @@ class SomaticMutationCaller:
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
         elif self.method == 'LR':
-            base_probs, BQs, n_mismatch, n_double = get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment)
+            base_probs, BQs, n_mismatch, n_double, n_pos, n_neg = \
+                get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
             for A in base_probs:
+                F_list = []
                 if A in filter_alleles:
                     continue
+                altMQs = [MQ for x,y,MQ in base_probs[A] if x<y]
+                if len(altMQs) == 0:
+                    continue
+                altMQs.sort()
+                medianMQ=altMQs[len(altMQs)//2]
+                
+                if medianMQ < 30:
+                    if self.filter:
+                        continue
+                    else:
+                        F_list.append("lowMQ")
+
+
                 LR, N, N_A, AF = get_LR(base_probs[A])
                 # make LR into p-value
-                p_val = scipy.stats.chi2.sf(-2*LR, 2)
-                if p_val < self.cutoff:
+                QUAL = int(-LR)
+                #if QUAL < 60:
+                #    continue
+                #p_val = scipy.stats.chi2.sf(-2*LR, 2)
+                #if p_val < self.cutoff:
+                if QUAL > 0:
                     oldBQ = [x[0] for x in BQs[A]]
                     newBQ = '[' +','.join(f'{x[1]:.1f}' for x in BQs[A]) + ']'
+                    
+                    oldBQ_str = str(oldBQ)
+                    oldBQ.sort()
+                    medianBQ=oldBQ[len(oldBQ)//2]
+                    
+                    n37 = sum(x[0]==37 for x in BQs[A])
+                    if medianBQ < 20:
+                        if self.filter:
+                            continue
+                        else:
+                            F_list.append("lowBQ")
+
+                    enddist = [x[2] for x in BQs[A]]
+                    enddist_str = str(enddist)
+                    enddist.sort()
+                    median_enddist = enddist[len(enddist)//2]
+
+                    if median_enddist <= 1:
+                        if self.filter:
+                            continue
+                        else:
+                            F_list.append("lowEndDist")
+
                     n_calls += 1
-                    print(f'{chrom}\t{ref_pos+1}\t{ref}\t{A}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ};newBQ={newBQ}', file=self.outfile)
+                    if len(F_list) == 0:
+                        FILTER = "PASS"
+                    else:
+                        FILTER = ','.join(F_list)
+                    
+                    #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str}', file=self.outfile)
 
         return n_calls
 

@@ -132,7 +132,7 @@ class Read:
         self.isR1 = pileup_read.alignment.is_read1
         self.mapq = pileup_read.alignment.mapping_quality
         #self.NH = pileup_read.alignment.get_tag("NH")
-
+        self.enddist = min(self.pos, len(pileup_read.alignment.query_sequence)-self.pos)
         # Process cigar stats
         cigar_stats = pileup_read.alignment.get_cigar_stats()[1]
         self.has_indel = sum(cigar_stats[1:4]) != 0
