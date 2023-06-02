@@ -116,6 +116,11 @@ def get_parser():
         help="Do not make bayesian update of error rate but use rate only estimated from kmers")
     call_parent.add_argument('--double_adjustment', type=float, default=0.5,
         help="How much lower should the error rate be if we see a matching overlap.")
+    call_parent.add_argument('--min_BQ', type=int, default=1,
+        help="Minimum base quality to considder")
+    call_parent.add_argument('--min_MQ', type=int, default=50,
+        help="Minimum base quality to considder")
+
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -353,7 +358,9 @@ def run_call(opts, kmer_papas):
             opts.cutoff,
             opts.prior_N,
             opts.no_update,
-            opts.double_adjustment
+            opts.double_adjustment,
+            opts.min_MQ,
+            opts.min_BQ
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()

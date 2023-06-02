@@ -556,7 +556,10 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                     #if overlap_type == "double":
                     read_BQ = max(read.base_qual, mem_read.base_qual)
                     enddist = max(read.enddist, mem_read.enddist)
-                    events[A].append(("double", X, read_BQ, read_MQ, enddist))
+                    has_indel = max(read.has_indel, mem_read.has_indel)
+                    has_clip = max(read.has_clip, mem_read.has_clip)
+                    NM = max(read.NM, mem_read.NM)
+                    events[A].append(("double", X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM))
 
             else: # Mismatch
                 #if not no_update:
@@ -592,7 +595,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 n_pos[X] += 1
         
         for A in alts:
-            events[A].append(("single", X, read.base_qual, read.mapq, read.enddist))
+            events[A].append(("single", X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM))
         
     new_correction_factor = defaultdict(dict)
 
@@ -641,7 +644,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
     BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
     for A in seen_alt:
-        for overlap_type, X, read_BQ, read_MQ, enddist in events[A]:
+        for overlap_type, X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM in events[A]:
             muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
             muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
             
@@ -650,7 +653,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
 
             posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
             if A==X:
-                BQs[A].append((read_BQ, posterior_from_R, enddist))
+                BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM))
                     
     return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
 

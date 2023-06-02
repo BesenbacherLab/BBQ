@@ -134,10 +134,12 @@ class Read:
         #self.NH = pileup_read.alignment.get_tag("NH")
         self.enddist = min(self.pos, len(pileup_read.alignment.query_sequence)-self.pos)
         # Process cigar stats
-        cigar_stats = pileup_read.alignment.get_cigar_stats()[1]
+        cigar_stats = pileup_read.alignment.get_cigar_stats()[0]
         self.has_indel = sum(cigar_stats[1:4]) != 0
         self.has_clip = sum(cigar_stats[4:6]) != 0
+        #self.NM = cigar_stats[8]
         self.NM = cigar_stats[10]
+        #print(pileup_read.alignment.get_cigar_stats())
 
 
 class ReadPair:
