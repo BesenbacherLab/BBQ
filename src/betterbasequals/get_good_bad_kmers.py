@@ -147,7 +147,9 @@ class MutationCounterWFilter:
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
             return
-
+        
+        if len(kmer) != 2*self.radius + 1:
+            return 0
         ref = kmer[self.radius]
 
         #If the major in the filter bam file does not match the ref we ignore the site.

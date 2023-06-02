@@ -250,6 +250,8 @@ class SomaticMutationCaller:
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
             return 0
+        if len(kmer) != 2*self.radius + 1:
+            return 0
         ref = kmer[self.radius]
         if ref not in "ATGC":
             return 0

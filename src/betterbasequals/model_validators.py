@@ -431,7 +431,9 @@ class ListMutationValidator:
 
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
-            return 
+            return
+        if len(kmer) != 2*self.radius + 1:
+            return
         ref = kmer[self.radius]
         if ref not in "ATGC":
             return 
