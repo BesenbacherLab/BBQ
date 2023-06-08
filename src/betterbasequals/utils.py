@@ -140,6 +140,12 @@ class Read:
         #self.NM = cigar_stats[8]
         self.NM = cigar_stats[10]
         #print(pileup_read.alignment.get_cigar_stats())
+    
+    def is_good(self):
+        return (self.NM <= 1 and
+                not self.has_indel and
+                not self.has_clip and
+                self.enddist > 1)
 
 
 class ReadPair:
@@ -151,6 +157,7 @@ class ReadPair:
         self.max_NM = max(read1.NM, read2.NM)
         self.has_indel = 1 if (read1.has_indel or read2.has_indel) else 0
         self.has_clip = 1 if (read1.has_clip or read2.has_clip) else 0
+
 
 
 

@@ -28,6 +28,10 @@ def get_pileup_count(pileupcolumn, ref, min_base_qual, blood=False):
 
         # fetch read information
         read = Read(pileup_read)
+
+        if not read.is_good():
+            continue
+
         # test if read is okay
         if (
             read.allel not in "ATGC"
@@ -66,6 +70,9 @@ def get_pileup_count_double(pileupcolumn, ref, min_base_qual):
 
         # fetch read information
         read = Read(pileup_read)
+
+        if not read.is_good():
+            continue
 
         # test if read is okay
         if (
@@ -139,6 +146,9 @@ def get_alleles_w_corrected_quals(pileupcolumn, ref, papa_ref, kmer, correction_
 
         # fetch read information
         read = Read(pileup_read)
+
+        if not read.is_good():
+            continue
 
         # test if read is okay
         if (
@@ -225,6 +235,9 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 
         # fetch read information
         read = Read(pileup_read)
+
+        if not read.is_good():
+            continue
 
         # test if read is okay
         if (
@@ -521,6 +534,9 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         # fetch read information
         read = Read(pileup_read)
 
+        if not read.is_good():
+            continue
+
         # test if read is okay
         if (
             read.allel not in "ATGC"
@@ -687,6 +703,9 @@ def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correctio
         # fetch read information
         read = Read(pileup_read)
 
+        if not read.is_good():
+            continue
+
         # test if read is okay
         if (
             read.allel not in "ATGC"
@@ -844,6 +863,9 @@ def get_validation_probabities(pileupcolumn, ref, ref_kmer, correction_factor, i
         # fetch read information
         read = Read(pileup_read)
 
+        if not read.is_good():
+            continue
+
         # test if read is okay
         if (
             read.allel not in "ATGC"
@@ -932,6 +954,9 @@ def get_adjustments(pileupcolumn, ref, papa_ref, kmer, correction_factor, change
         # fetch read information
         read = Read(pileup_read)
 
+        if not read.is_good():
+            continue
+
         # test if read is okay
         if (
             read.allel not in "ATGC"
@@ -993,6 +1018,9 @@ def get_alleles_w_quals(pileupcolumn):
 
         # fetch read information
         read = Read(pileup_read)
+
+        if not read.is_good():
+            continue
 
         # test if read is okay
         if (

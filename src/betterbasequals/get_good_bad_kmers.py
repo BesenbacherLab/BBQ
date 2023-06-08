@@ -177,7 +177,9 @@ class MutationCounterWFilter:
 
             # fetch read information
             read = Read(pileup_read)
-
+            if not read.is_good():
+                continue
+            
             # test if read is okay
             if (
                 read.allel not in "ATGC"
