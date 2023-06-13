@@ -45,7 +45,8 @@ def get_parser():
     # args for filter bam file
     filter_parent = argparse.ArgumentParser(add_help=False)
     filter_parent.add_argument("--filter_bam_file", help="bam file from blood")
-
+    
+                              
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
     count_parent.add_argument("--output_file_good", type=argparse.FileType('w'))
@@ -120,6 +121,8 @@ def get_parser():
         help="Minimum base quality to considder")
     call_parent.add_argument('--min_MQ', type=int, default=50,
         help="Minimum base quality to considder")
+    call_parent.add_argument('--filter_max_count', type=int, default=2,
+                             help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
 
 
     count_parser = subparsers.add_parser('count', 
@@ -360,7 +363,8 @@ def run_call(opts, kmer_papas):
             opts.no_update,
             opts.double_adjustment,
             opts.min_MQ,
-            opts.min_BQ
+            opts.min_BQ,
+            opts.filter_max_count
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()
