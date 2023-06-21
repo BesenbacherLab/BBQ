@@ -1,6 +1,6 @@
 import py2bit
 from scipy.optimize import minimize_scalar
-from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred
+from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader
 from betterbasequals.pilup_handlers import get_alleles_w_probabities_update
 from collections import Counter
 import scipy.stats
@@ -115,6 +115,7 @@ class SomaticMutationCaller:
         mapq = 50,
         min_base_qual = 1,
         min_filter_count = 2,
+        pop_vcf = None,
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
@@ -158,6 +159,12 @@ class SomaticMutationCaller:
         self.prior_N = prior_N
         self.no_update = no_update
         self.double_adjustment = double_adjustment
+
+        if not pop_vcf is None:
+            self.pop_vcf = VcfAfReader(pop_vcf)
+        else:
+            self.pop_vcf = None
+
         self.mapq = mapq
         self.min_base_qual = min_base_qual
         self.filter_mapq = filter_mapq
@@ -168,10 +175,12 @@ class SomaticMutationCaller:
         self.prefix = prefix
         self.filter = False
 
+
         #TODO: filter_depth variable should be set based on average coverage in filter file.
         self.min_filter_depth = 10
         self.max_filter_depth = 1000000
         self.min_filter_count = min_filter_count
+
         # Create correction factor dict:
 
         # self.correction_factor = {mtype:{} for mtype in kmer_papa}
@@ -267,6 +276,12 @@ class SomaticMutationCaller:
             base_probs, BQs, n_mismatch, n_double, n_pos, n_neg = \
                 get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
+            
+            if not self.pop_vcf is None:
+                pop_af = self.pop_vcf.query(chrom, ref_pos+1, ref)
+            else:
+                pop_af = None
+
             for A in base_probs:
                 F_list = []
                 
@@ -333,9 +348,13 @@ class SomaticMutationCaller:
                         FILTER = "PASS"
                     else:
                         FILTER = ','.join(F_list)
+
                     optional_info = ''
                     if not n_alleles is None:
                         optional_info = f';N_A_f={n_alleles[A]}'
+                    if not pop_af is None and pop_af[A] > 1e-7:
+                        optional_info += f';pop_AF={pop_af[A]}'
+
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
                     print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer}{optional_info}', file=self.outfile)
 

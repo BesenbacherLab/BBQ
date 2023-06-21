@@ -122,7 +122,9 @@ def get_parser():
     call_parent.add_argument('--min_MQ', type=int, default=50,
         help="Minimum base quality to considder")
     call_parent.add_argument('--filter_max_count', type=int, default=2,
-                             help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
+        help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
+    call_parent.add_argument("--pop_vcf", type=str,
+        help='Population vcf with AF field.')                            
 
 
     count_parser = subparsers.add_parser('count', 
@@ -364,7 +366,8 @@ def run_call(opts, kmer_papas):
             opts.double_adjustment,
             opts.min_MQ,
             opts.min_BQ,
-            opts.filter_max_count
+            opts.filter_max_count,
+            opts.pop_vcf
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()

@@ -7,6 +7,7 @@ from collections import defaultdict
 from math import log10
 import pysam
 import os
+import gzip
 
 #mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T')
 mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'A->A', 'C->C')
@@ -378,3 +379,87 @@ def parse_opts_region(opts):
         opts.chrom = opts.region
         opts.start = None
         opts.end = None
+
+
+class VcfAfReader:
+    """A simple VCF-file reader that only parses and returns AF field
+    for each position
+    """ 
+
+    def __init__(self, vcfname, ignore_indels=True, field_name="AF"):
+        # TODO: check if name ends in gz and then open using gzip
+        if vcfname.endswith('.gz') or vcfname.endswith('.bgz') or vcfname.endswith('.zip'):
+            self.f = gzip.open(vcfname, 'rt')
+        else:
+            self.f = open(vcfname)
+        
+        # Read lines until we are past comment lines
+        vcf_line = self.f.readline()
+        while vcf_line.startswith("#"):
+            vcf_line = self.f.readline()
+        
+        vcfL = vcf_line.split()
+        self.vcf_chrom = vcfL[0]
+        self.vcf_pos = int(vcfL[1])
+        self.vcf_ref = vcfL[3]
+        self.vcf_alt = vcfL[4]
+        self.vcf_info = vcfL[7]
+        self.ignore_indels = ignore_indels
+        self.field_name = field_name
+        self.last_pos = -1
+        self.last_chrom = "0"
+
+    def parse_line(self, vcf_line):
+        vcfL = vcf_line.split()
+        if len(vcfL) == 0:
+            self.vcf_chrom = 'z' # should sort after all posible query chrom names
+            return
+
+        if vcfL[0] == self.vcf_chrom:
+            assert int(vcfL[1]) >= self.vcf_pos, "ERROR: vcffile positions not sorted!"
+        else:
+            assert vcfL[0] >= self.vcf_chrom, "ERROR: vcffile chromosomes not sorted!"
+
+        self.vcf_chrom = vcfL[0]
+        self.vcf_pos = int(vcfL[1])
+        self.vcf_ref = vcfL[3]
+        self.vcf_alt = vcfL[4]
+        self.vcf_info = vcfL[7]
+
+    def parse_AF(self):
+        fn = self.field_name + '='
+        L = self.vcf_info.split(";")
+        for x in L:
+            if x.startswith(fn):
+                return float(x[len(fn):])
+
+    def query(self, chrom, pos, ref):
+        #Check that current query is after the last query
+        assert chrom > self.last_chrom or (chrom == self.last_chrom and pos > self.last_pos), "ERROR: queries should be in sorted order! Please sort bam file."
+        self.last_chrom = chrom
+        self.last_pos = pos
+
+        while self.vcf_chrom < chrom or (self.vcf_chrom == chrom and self.vcf_pos < pos):
+            self.parse_line(self.f.readline())
+       
+        if (chrom == self.vcf_chrom) and ( self.vcf_pos == pos):
+            af_dict = defaultdict(float)
+            while((chrom == self.vcf_chrom) and ( self.vcf_pos == pos)):
+
+                #Check that reference matches
+                assert self.vcf_ref[0] == ref, f'''
+                    ERROR: ref allele in vcffile ({self.vcf_ref[0]}) doesn't match ref({ref}).
+                    line: {self.vcf_chrom} {self.vcf_pos} {self.vcf_ref} {self.vcf_alt} {self.vcf_info}.
+                    Check genome build!
+                    '''
+
+                #ignore indels if ignore_indels option is set:
+                if not self.ignore_indels or len(self.vcf_ref)==1 and len(self.vcf_alt)==1:
+                    af_dict[self.vcf_alt] = self.parse_AF()
+
+                self.parse_line(self.f.readline())
+
+            return af_dict
+        else:
+            return None
+
