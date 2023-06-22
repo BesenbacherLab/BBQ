@@ -507,7 +507,7 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 
 
 
-def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5):
+def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5, filter_reads = True):
     """
     Returns a dictionary that maps from allele A to a list of tuples with probability of 
     observing Alt allele A given then read and probability of observing ref allele R given 
@@ -534,7 +534,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         # fetch read information
         read = Read(pileup_read)
 
-        if not read.is_good():
+        if filter_reads and not read.is_good():
             continue
 
         # test if read is okay
