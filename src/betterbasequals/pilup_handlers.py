@@ -570,12 +570,12 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
 
                     read_MQ = (read.mapq + mem_read.mapq)/2
                     #if overlap_type == "double":
-                    read_BQ = max(read.base_qual, mem_read.base_qual)
+                    #read_BQ = max(read.base_qual, mem_read.base_qual)
                     enddist = max(read.enddist, mem_read.enddist)
                     has_indel = max(read.has_indel, mem_read.has_indel)
                     has_clip = max(read.has_clip, mem_read.has_clip)
                     NM = max(read.NM, mem_read.NM)
-                    events[A].append(("double", X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM))
+                    events[A].append(("double", X, (read.base_qual, mem_read.base_qual), read_MQ, enddist, has_indel, has_clip, NM))
 
             else: # Mismatch
                 #if not no_update:
@@ -621,7 +621,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
 
     for BQ in correction_factor:
         new_correction_factor[BQ]["single"] = defaultdict(dict)
-        new_correction_factor[BQ]["double"] = defaultdict(dict)
+        # new_correction_factor[BQ]["double"] = defaultdict(dict)
 
         for from_base in relevant_bases:
             p_rest = 1.0
@@ -643,19 +643,19 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                 new_correction_factor[BQ]["single"][change_type][change_kmer] = p2phred(p_posterior)
 
-                p_prior_double = p_prior * double_adjustment
-                a = p_prior_double * prior_N
-                b = prior_N - a
-                if no_update or from_base != ref:
-                    p_posterior = a/(a + b)
-                else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                p_rest_double -= p_posterior
-                new_correction_factor[BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
+                # p_prior_double = p_prior * double_adjustment
+                # a = p_prior_double * prior_N
+                # b = prior_N - a
+                # if no_update or from_base != ref:
+                #     p_posterior = a/(a + b)
+                # else:
+                #     p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                # #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
+                # p_rest_double -= p_posterior
+                # new_correction_factor[BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
             
             new_correction_factor[BQ]["single"][stay_type][stay_kmer] = p2phred(p_rest)
-            new_correction_factor[BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
+            # new_correction_factor[BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
 
     posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
     BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
@@ -663,9 +663,13 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         for overlap_type, X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM in events[A]:
             muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
             muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-            
-            posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
-            posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
+            if overlap_type == "single":
+                posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
+                posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
+            elif overlap_type == "double":
+                BQ1, BQ2 = read_BQ
+                posterior_from_A = new_correction_factor[BQ1]["single"][muttype_from_A][kmer_from_A] + new_correction_factor[BQ2]["single"][muttype_from_A][kmer_from_A]
+                posterior_from_R = new_correction_factor[BQ1]["single"][muttype_from_R][kmer_from_R] + new_correction_factor[BQ2]["single"][muttype_from_R][kmer_from_R]
 
             posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
             if A==X:
