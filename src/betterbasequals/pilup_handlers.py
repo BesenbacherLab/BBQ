@@ -670,6 +670,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 BQ1, BQ2 = read_BQ
                 posterior_from_A = new_correction_factor[BQ1]["single"][muttype_from_A][kmer_from_A] + new_correction_factor[BQ2]["single"][muttype_from_A][kmer_from_A]
                 posterior_from_R = new_correction_factor[BQ1]["single"][muttype_from_R][kmer_from_R] + new_correction_factor[BQ2]["single"][muttype_from_R][kmer_from_R]
+                read_BQ = max(BQ1,BQ2)
 
             posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
             if A==X:
