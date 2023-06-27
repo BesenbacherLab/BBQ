@@ -146,7 +146,7 @@ class Read:
         return (self.NM <= 1 and
                 not self.has_indel and
                 not self.has_clip and
-                self.enddist > 1)
+                self.enddist > 5)
 
 
 class ReadPair:
