@@ -534,8 +534,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         # fetch read information
         read = Read(pileup_read)
 
-        if filter_reads and not read.is_good():
-            continue
+        #if filter_reads and not read.is_good():
+        #    continue
 
         # test if read is okay
         if (
@@ -559,13 +559,15 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 if X == R:
                     alts = [A for A in ['A','C','G','T'] if A!=R]
                 else:
+                    if not read.is_good() or not mem_read.is_good():
+                        continue
                     alts = [X]
                     seen_alt.add(X)
                     n_pos[X] += 1
                     n_neg[X] += 1
 
                 for A in alts:
-                    #if not no_update:    
+                    #if not no_update:   
                     n_double[A] += 1
 
                     read_MQ = (read.mapq + mem_read.mapq)/2
@@ -603,6 +605,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         if X == R:
             alts = [A for A in ['A','C','G','T'] if A!=R]
         else:
+            if not read.is_good():
+                continue
             alts = [X]
             seen_alt.add(X)
             if read.is_reverse:
