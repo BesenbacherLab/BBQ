@@ -555,12 +555,13 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
             # We do not trust mismathces in overlaps so we only add to events list in case of match
             if read.allel == mem_read.allel:
                 X = read.allel
-            
+                
+                if filter_reads and (not read.is_good() or not mem_read.is_good()):
+                    continue
+
                 if X == R:
                     alts = [A for A in ['A','C','G','T'] if A!=R]
                 else:
-                    if not read.is_good() or not mem_read.is_good():
-                        continue
                     alts = [X]
                     seen_alt.add(X)
                     n_pos[X] += 1
@@ -601,12 +602,13 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     # Handle reads without partner (ie. no overlap)
     for read in reads_mem.values():
         X = read.allel
+        if filter_reads and not read.is_good():
+            continue
             
         if X == R:
             alts = [A for A in ['A','C','G','T'] if A!=R]
         else:
-            if not read.is_good():
-                continue
+
             alts = [X]
             seen_alt.add(X)
             if read.is_reverse:
