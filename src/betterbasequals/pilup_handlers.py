@@ -534,15 +534,14 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         # fetch read information
         read = Read(pileup_read)
 
-        if filter_reads and not read.is_good():
-            continue
+        #if filter_reads and not read.is_good():
+        #    continue
 
         # test if read is okay
         if (
             read.allel not in "ATGC"
             or read.start is None
             or read.end is None
-            #or read.NH != 1
         ):
             continue
 
@@ -555,9 +554,16 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
             # We do not trust mismathces in overlaps so we only add to events list in case of match
             if read.allel == mem_read.allel:
                 X = read.allel
-                
-                #if filter_reads and (not read.is_good() or not mem_read.is_good()):
-                #    continue
+
+                if filter_reads:
+                    if (not read.is_good()) and mem_read.is_good():
+                        #considder mem_read single read.
+                        reads_mem[read.query_name] = mem_read
+                        continue
+                    elif (not mem_read.is_good()) and read.is_good():
+                        #considder read single read.
+                        reads_mem[read.query_name] = read
+                        continue                   
 
                 if X == R:
                     alts = [A for A in ['A','C','G','T'] if A!=R]
@@ -602,8 +608,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     # Handle reads without partner (ie. no overlap)
     for read in reads_mem.values():
         X = read.allel
-        #if filter_reads and not read.is_good():
-        #    continue
+        if filter_reads and not read.is_good():
+            continue
             
         if X == R:
             alts = [A for A in ['A','C','G','T'] if A!=R]
