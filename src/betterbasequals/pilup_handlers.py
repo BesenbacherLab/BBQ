@@ -563,7 +563,9 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                     elif (not mem_read.is_good()) and read.is_good():
                         #considder read single read.
                         reads_mem[read.query_name] = read
-                        continue                   
+                        continue
+                    elif (not read.is_good()) and (not mem_read.is_good()):
+                        continue
 
                 if X == R:
                     alts = [A for A in ['A','C','G','T'] if A!=R]
