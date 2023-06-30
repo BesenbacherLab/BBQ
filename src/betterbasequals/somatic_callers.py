@@ -45,24 +45,15 @@ def get_LR_with_MQ(base_probs):
     # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
     def p_data_given_mut(alpha):
         #return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
-        return sum(p2phred((1-p_map_error)*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) +p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
+        return sum(p2phred((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
 
     res = minimize_scalar(p_data_given_mut, bounds=(0, 1), method='bounded')
-    # Alternative:
-    # Integrate out alpha (maybe I should call the getBF (Bayes Factor) instead of getLR then)
-    # LL, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
-    # Bør nok have prior fordeling på alpha så.
+
     N = len(base_probs)
     N_A = sum(1 for x,y,_ in base_probs if x<y)
     alpha = res.x
 
-    #if N_A > 1:
-    #    print(base_probs)
-    #    print([p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs])
-    #    eprint(f'alpha={res.x} N={N} N_A={N_A}')
-    #    print(res.fun, sum(p_r2x for p_a2x, p_r2x in base_probs),  res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs))
-    #LR = res.fun - sum(p2phred((1-p_map_error)*phred2p(p_r2x)+p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-    LR = res.fun - sum(p_r2x for p_a2x, p_r2x, _ in base_probs)
+    LR = res.fun - sum(p2phred((1-phred2p(p_map_error))*phred2p(p_r2x)+phred2p(p_map_error)*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
     return LR, N, N_A, alpha
 
 
@@ -272,7 +263,7 @@ class SomaticMutationCaller:
         elif self.method == 'sum':
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
-        elif self.method == 'LR':
+        elif self.method in ['LR','LR_with_MQ']:
             base_probs, BQs, n_mismatch, n_double, n_pos, n_neg = \
                 get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
@@ -303,8 +294,10 @@ class SomaticMutationCaller:
                         continue
                     else:
                         F_list.append("lowMQ")
-
-                LR, N, N_A, AF = get_LR(base_probs[A])
+                if self.method == 'LR':
+                    LR, N, N_A, AF = get_LR(base_probs[A])
+                elif self.method == 'LR_with_MQ':
+                    LR, N, N_A, AF = get_LR_with_MQ(base_probs[A])
                 # make LR into p-value
                 QUAL = int(-LR)
                 #if QUAL < 60:

@@ -107,7 +107,7 @@ def get_parser():
     call_parent.add_argument('--outfile', type=argparse.FileType('w'), default=sys.stdout,
         help="output file")
     call_parent.add_argument('--method', type=str,
-        choices=['LR', "poisson", 'BF'], default="LR",
+        choices=['LR', 'LR_with_MQ', 'poisson', 'BF'], default="LR",
         help="Method used to calculate variant quality scores")
     call_parent.add_argument('--cutoff', type=float, default=0.001,
         help="initial variant calling p-value cutoff")
