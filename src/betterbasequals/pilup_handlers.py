@@ -1,5 +1,6 @@
 from collections import Counter, defaultdict
 from betterbasequals.utils import Read, ReadPair, reverse_complement, phred2p, p2phred
+import math
 
 def get_mut_type(ref, papa_ref, alt):
     if ref != papa_ref:
@@ -507,7 +508,7 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 
 
 
-def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5, filter_reads = True):
+def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=2, filter_reads = True):
     """
     Returns a dictionary that maps from allele A to a list of tuples with probability of 
     observing Alt allele A given then read and probability of observing ref allele R given 
@@ -680,7 +681,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 p_prior_1 = alpha1/(alpha1+beta1)
                 p_prior_2 = alpha2/(alpha2+beta2)
 
-                p_prior_double = p_prior_1 * p_prior_2
+                p_prior_double = math.exp(math.log(p_prior_1)/double_adjustment) * p_prior_2
                 a = p_prior_double * prior_N
                 b = prior_N - a
                 if no_update or from_base != ref:
