@@ -60,7 +60,8 @@ def get_parser():
         help="minimum depth in filter_bam_file for a site to be considered as training data")
     count_parent.add_argument('--filter_max_depth', type=int, default=5000,
         help="maximum depth om filter_bam_file at a site to be considered as training data")
-
+    count_parent.add_argument('--min_enddist', type=int, default=6, metavar="M",
+        help="Ignore bases in the first M or last M positions in the read")
 
     # args for training models:    
     train_parent = argparse.ArgumentParser(add_help=False)
@@ -124,7 +125,11 @@ def get_parser():
     call_parent.add_argument('--filter_max_count', type=int, default=2,
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
     call_parent.add_argument("--pop_vcf", type=str,
-        help='Population vcf with AF field.')                            
+        help='Population vcf with AF field.')
+    call_parent.add_argument('--min_enddist', type=int, default=6, metavar="M",
+        help="Ignore bases in the first M or last M positions in the read")
+    # TODO:
+    # Could make read_filter_parent to avoid duplicating min_enddist argument                   
 
 
     count_parser = subparsers.add_parser('count', 
@@ -212,7 +217,8 @@ def run_get_good_and_bad_w_filter(opts):
             opts.bam_file, 
             opts.twobit_file, 
             opts.filter_bam_file,
-            radius = opts.radius)
+            radius = opts.radius,
+            min_enddist=opts.min_enddist)
     if opts.chrom is None:
         good_kmers, bad_kmers = \
             counter.count_mutations_all_chroms()
@@ -367,7 +373,8 @@ def run_call(opts, kmer_papas):
             opts.min_MQ,
             opts.min_BQ,
             opts.filter_max_count,
-            opts.pop_vcf
+            opts.pop_vcf,
+            opts.min_enddist
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()

@@ -30,6 +30,7 @@ class MutationCounterWFilter:
         min_filter_count = 2,
         min_filter_depth = 10,
         max_filter_depth = 100,
+        min_enddist = 6,
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
@@ -58,6 +59,7 @@ class MutationCounterWFilter:
         self.min_filter_count = min_filter_count
         self.min_filter_depth = min_filter_depth
         self.max_filter_depth = max_filter_depth
+        self.min_enddist = min_enddist
 
     def __del__(self):
         self.tb.close()
@@ -127,14 +129,14 @@ class MutationCounterWFilter:
                 else:
                     major = n_alleles.most_common(1)[0]
 
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, major[0])
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, self.min_enddist, major[0])
         else:
             for pileupcolumn in pileup:
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers)
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, self.min_enddist)
         
         return good_kmers, bad_kmers
 
-    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, major_allele = None):
+    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, min_enddist, major_allele = None):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
@@ -177,7 +179,7 @@ class MutationCounterWFilter:
 
             # fetch read information
             read = Read(pileup_read)
-            if not read.is_good():
+            if not read.is_good(min_enddist):
                 continue
             
             # test if read is okay

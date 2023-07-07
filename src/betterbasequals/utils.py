@@ -142,11 +142,11 @@ class Read:
         self.NM = cigar_stats[10]
         #print(pileup_read.alignment.get_cigar_stats())
     
-    def is_good(self):
+    def is_good(self, min_enddist=6):
         return (self.NM <= 1 and
                 not self.has_indel and
                 not self.has_clip and
-                self.enddist > 5)
+                self.enddist >= min_enddist)
 
 
 class ReadPair:
