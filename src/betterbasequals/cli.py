@@ -46,7 +46,10 @@ def get_parser():
     filter_parent = argparse.ArgumentParser(add_help=False)
     filter_parent.add_argument("--filter_bam_file", help="bam file from blood")
     
-                              
+    read_filter_parent = argparse.ArgumentParser(add_help=False)
+    read_filter_parent.add_argument('--min_enddist', type=int, default=6, metavar="M",
+        help="Ignore bases in the first M or last M positions in the read")
+
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
     count_parent.add_argument("--output_file_good", type=argparse.FileType('w'))
@@ -60,8 +63,6 @@ def get_parser():
         help="minimum depth in filter_bam_file for a site to be considered as training data")
     count_parent.add_argument('--filter_max_depth', type=int, default=5000,
         help="maximum depth om filter_bam_file at a site to be considered as training data")
-    count_parent.add_argument('--min_enddist', type=int, default=6, metavar="M",
-        help="Ignore bases in the first M or last M positions in the read")
 
     # args for training models:    
     train_parent = argparse.ArgumentParser(add_help=False)
@@ -126,32 +127,28 @@ def get_parser():
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
     call_parent.add_argument("--pop_vcf", type=str,
         help='Population vcf with AF field.')
-    call_parent.add_argument('--min_enddist', type=int, default=6, metavar="M",
-        help="Ignore bases in the first M or last M positions in the read")
-    # TODO:
-    # Could make read_filter_parent to avoid duplicating min_enddist argument                   
-
+    
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
         help =  'Count good and bad k-mers',
-        parents=[bam_parent, filter_parent, count_parent],
+        parents=[bam_parent, filter_parent, count_parent, read_filter_parent],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     train_parser = subparsers.add_parser('train', 
         description='First run "count" then train model to distinguish good and bad k-mers.', 
         help = 'First run "count" then train model to distinguish good and bad k-mers.',
-        parents=[bam_parent, filter_parent, count_parent, train_parent])
+        parents=[bam_parent, filter_parent, count_parent, train_parent, read_filter_parent])
 
     validate_parser = subparsers.add_parser('validate', 
         description = 'First run "count" and "train" then print validation data',
         help = 'First run "count" and "train" then print validation data',
-        parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent])
+        parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent, read_filter_parent])
 
     list_validate_parser = subparsers.add_parser('list_validate', 
         description = 'First run "count" and "train" then print validation data',
         help = 'First run "count" and "train" then print validation data',
-        parents=[bam_parent, filter_parent, count_parent, train_parent, list_validate_parent])
+        parents=[bam_parent, filter_parent, count_parent, train_parent, list_validate_parent, read_filter_parent])
 
 
     adjust_parser = subparsers.add_parser('adjust', 
@@ -162,7 +159,7 @@ def get_parser():
     call_parser = subparsers.add_parser('call', 
         description = 'First run "count" and "train" then call variants', 
         help = 'First run "count" and "train" then call variants', 
-        parents = [bam_parent, count_parent, train_parent, call_parent])
+        parents = [bam_parent, count_parent, train_parent, call_parent, read_filter_parent])
 
     train_only_parser = subparsers.add_parser('train_only', 
         description = 'Train model to distinguish good and bad k-mers.',
@@ -183,7 +180,6 @@ def get_parser():
         parents = [bam_parent, filter_parent, list_validate_parent]) 
     list_validate_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
 
-
     adjust_only_parser = subparsers.add_parser('adjust_only', 
         description = 'Output bam with adjusted base qualities.', 
         help = 'Output bam with adjusted base qualities.',
@@ -193,7 +189,7 @@ def get_parser():
     call_only_parser = subparsers.add_parser('call_only', 
         description = 'Call variants',
         help = 'Call variants',
-        parents=[bam_parent, filter_parent, call_parent])
+        parents=[bam_parent, filter_parent, call_parent, read_filter_parent])
     call_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
     
     test_kmerpapa_parser = subparsers.add_parser('test_kmerpapa', 
