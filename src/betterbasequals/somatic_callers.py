@@ -108,6 +108,7 @@ class SomaticMutationCaller:
         min_filter_count = 2,
         pop_vcf = None,
         min_enddist = 6,
+        max_mismatch = 2,
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
@@ -158,6 +159,7 @@ class SomaticMutationCaller:
             self.pop_vcf = None
 
         self.min_enddist = min_enddist
+        self.max_mismatch = max_mismatch
         self.mapq = mapq
         self.min_base_qual = min_base_qual
         self.filter_mapq = filter_mapq
@@ -267,7 +269,7 @@ class SomaticMutationCaller:
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
         elif self.method in ['LR','LR_with_MQ']:
             base_probs, BQs, n_mismatch, n_double, n_pos, n_neg = \
-                get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment, self.min_enddist)
+                get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment, self.min_enddist, self.max_mismatch)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
             #no_filter_base_probs, no_filter_BQs, no_filter_n_mismatch, no_filter_n_double, no_filter_n_pos, no_filter_n_neg = \

@@ -507,7 +507,7 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 
 
 
-def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5, min_enddist=6, filter_reads = True):
+def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5, min_enddist=6, max_mismatch=2, filter_reads = True):
     """
     Returns a dictionary that maps from allele A to a list of tuples with probability of 
     observing Alt allele A given then read and probability of observing ref allele R given 
@@ -556,15 +556,15 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 X = read.allel
 
                 if filter_reads:
-                    if (not read.is_good(min_enddist)) and mem_read.is_good(min_enddist):
+                    if (not read.is_good(min_enddist, max_mismatch)) and mem_read.is_good(min_enddist, max_mismatch):
                         #considder mem_read single read.
                         reads_mem[read.query_name] = mem_read
                         continue
-                    elif (not mem_read.is_good(min_enddist)) and read.is_good(min_enddist):
+                    elif (not mem_read.is_good(min_enddist, max_mismatch)) and read.is_good(min_enddist, max_mismatch):
                         #considder read single read.
                         reads_mem[read.query_name] = read
                         continue
-                    elif (not read.is_good(min_enddist)) and (not mem_read.is_good(min_enddist)):
+                    elif (not read.is_good(min_enddist, max_mismatch)) and (not mem_read.is_good(min_enddist, max_mismatch)):
                         continue
 
                 if X == R:
@@ -611,7 +611,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     # Handle reads without partner (ie. no overlap)
     for read in reads_mem.values():
         X = read.allel
-        if filter_reads and not read.is_good(min_enddist):
+        if filter_reads and not read.is_good(min_enddist, max_mismatch):
             continue
             
         if X == R:

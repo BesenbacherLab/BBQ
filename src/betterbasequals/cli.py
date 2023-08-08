@@ -49,6 +49,8 @@ def get_parser():
     read_filter_parent = argparse.ArgumentParser(add_help=False)
     read_filter_parent.add_argument('--min_enddist', type=int, default=6, metavar="M",
         help="Ignore bases in the first M or last M positions in the read")
+    read_filter_parent.add_argument('--max_mismatch', type=int, default=1, metavar="M",
+        help="Ignore alt reads if the read has more than M mismatches to the reference")
 
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
@@ -214,7 +216,8 @@ def run_get_good_and_bad_w_filter(opts):
             opts.twobit_file, 
             opts.filter_bam_file,
             radius = opts.radius,
-            min_enddist=opts.min_enddist)
+            min_enddist = opts.min_enddist,
+            max_mismatch = opts.max_mismatch)
     if opts.chrom is None:
         good_kmers, bad_kmers = \
             counter.count_mutations_all_chroms()
@@ -370,7 +373,8 @@ def run_call(opts, kmer_papas):
             opts.min_BQ,
             opts.filter_max_count,
             opts.pop_vcf,
-            opts.min_enddist
+            opts.min_enddist,
+            opts.max_mismatch
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()

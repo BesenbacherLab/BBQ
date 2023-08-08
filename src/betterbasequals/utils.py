@@ -142,8 +142,8 @@ class Read:
         self.NM = cigar_stats[10]
         #print(pileup_read.alignment.get_cigar_stats())
     
-    def is_good(self, min_enddist=6):
-        return (self.NM <= 1 and
+    def is_good(self, min_enddist=6, max_mismatch = 2):
+        return (self.NM <= max_mismatch and
                 not self.has_indel and
                 not self.has_clip and
                 self.enddist >= min_enddist)
