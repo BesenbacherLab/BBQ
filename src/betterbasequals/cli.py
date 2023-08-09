@@ -402,34 +402,35 @@ def get_phred(tup):
  
 #TODO: include read_filter!
 def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
-    for bqual in kmer_papas:
-        for mtype in kmer_papas[bqual]:
-            if mtype[0] == mtype[-1]:
-                continue
-            eprint(f'Handling base_qual: {bqual}, mutation type: {mtype}')
-            for pat in kmer_papas[bqual][mtype]:
-                if opts.correction_type == "bad_vs_good":
-                    n_bad = sum(bad_kmers[bqual][mtype][x] for x in matches(pat))
-                    if opts.same_good:
-                        n_good = sum(good_kmers[37][mtype][x] for x in matches(pat))
-                    else:
-                        n_good = sum(good_kmers[bqual][mtype][x] for x in matches(pat))
-                elif opts.correction_type == "bad_vs_no":
-                    ref = mtype[0]
-                    alt = mtype[-1]
-                    notype = f'{ref}->{ref}'
-                    other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
-                    n_bad = sum(bad_kmers[bqual][mtype][x] for x in matches(pat))
-                    if opts.same_good:
-                        n_good = sum(good_kmers[37][notype][x] for x in matches(pat))
-                    else:
-                        n_good = sum(good_kmers[bqual][notype][x] + bad_kmers[bqual][other_type1][x] + bad_kmers[bqual][other_type2][x] for x in matches(pat))
+    for read_filter in [0,1]:
+        for bqual in kmer_papas[read_filter]:
+            for mtype in kmer_papas[read_filter][bqual]:
+                if mtype[0] == mtype[-1]:
+                    continue
+                eprint(f'Handling base_qual: {bqual}, mutation type: {mtype}')
+                for pat in kmer_papas[read_filter][bqual][mtype]:
+                    if opts.correction_type == "bad_vs_good":
+                        n_bad = sum(bad_kmers[read_filter][bqual][mtype][x] for x in matches(pat))
+                        if opts.same_good:
+                            n_good = sum(good_kmers[read_filter][37][mtype][x] for x in matches(pat))
+                        else:
+                            n_good = sum(good_kmers[read_filter][bqual][mtype][x] for x in matches(pat))
+                    elif opts.correction_type == "bad_vs_no":
+                        ref = mtype[0]
+                        alt = mtype[-1]
+                        notype = f'{ref}->{ref}'
+                        other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
+                        n_bad = sum(bad_kmers[read_filter][bqual][mtype][x] for x in matches(pat))
+                        if opts.same_good:
+                            n_good = sum(good_kmers[read_filter][37][notype][x] for x in matches(pat))
+                        else:
+                            n_good = sum(good_kmers[read_filter][bqual][notype][x] + bad_kmers[read_filter][bqual][other_type1][x] + bad_kmers[read_filter][bqual][other_type2][x] for x in matches(pat))
 
-                if n_bad > 0:
-                    phred = -10*log10(n_bad / (n_bad + n_good))
-                else:
-                    phred = 0
-                print(bqual, mtype, pat, get_phred(kmer_papas[bqual][mtype][pat]), n_bad, n_good, phred)
+                    if n_bad > 0:
+                        phred = -10*log10(n_bad / (n_bad + n_good))
+                    else:
+                        phred = 0
+                    print(read_filter, bqual, mtype, pat, get_phred(kmer_papas[read_filter][bqual][mtype][pat]), n_bad, n_good, phred)
 
 
 def main(args = None):

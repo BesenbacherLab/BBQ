@@ -518,8 +518,12 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
 
     reads_mem = {}
     seen_alt = set()
-    n_mismatch = Counter()
-    n_double = Counter()
+    n_mismatch = {}
+    n_mismatch[0] = Counter()
+    n_mismatch[1] = Counter()
+    n_double = {}
+    n_double[0] = Counter()
+    n_double[1] = Counter()
     n_pos = Counter()
     n_neg = Counter()
     events = {'A':[], 'C':[], 'G':[], 'T':[]}
@@ -564,8 +568,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                         #considder read single read.
                         reads_mem[read.query_name] = read
                         continue
-                    elif (not read.is_good(min_enddist, max_mismatch)) and (not mem_read.is_good(min_enddist, max_mismatch)):
-                        continue
+                    #elif (not read.is_good(min_enddist, max_mismatch)) and (not mem_read.is_good(min_enddist, max_mismatch)):
+                    #    continue
 
                 if X == R:
                     alts = [A for A in ['A','C','G','T'] if A!=R]
@@ -575,44 +579,54 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                     n_pos[X] += 1
                     n_neg[X] += 1
 
+                read_filter = int(read.is_good(min_enddist, max_mismatch)) # read and mem_read should have same filter status
+                read_MQ = (read.mapq + mem_read.mapq)/2
+                #if overlap_type == "double":
+                read_BQ = max(read.base_qual, mem_read.base_qual)
+                enddist = max(read.enddist, mem_read.enddist)
+                has_indel = max(read.has_indel, mem_read.has_indel)
+                has_clip = max(read.has_clip, mem_read.has_clip)
+                NM = max(read.NM, mem_read.NM)
+
                 for A in alts:
                     #if not no_update:   
-                    n_double[A] += 1
-
-                    read_MQ = (read.mapq + mem_read.mapq)/2
-                    #if overlap_type == "double":
-                    read_BQ = max(read.base_qual, mem_read.base_qual)
-                    enddist = max(read.enddist, mem_read.enddist)
-                    has_indel = max(read.has_indel, mem_read.has_indel)
-                    has_clip = max(read.has_clip, mem_read.has_clip)
-                    NM = max(read.NM, mem_read.NM)
+                    n_double[read_filter][A] += 2
+                    
                     #(read.base_qual, mem_read.base_qual)
-                    events[A].append(("double", X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM))
+                    events[A].append(("double", X, read_filter, read_BQ, read_MQ, enddist, has_indel, has_clip, NM))
 
             else: # Mismatch
                 #if not no_update:
                 # TODO: Would it make sense to also count ref_mismatches so that we could
                 # do bayesian update of A->R error rates and not only R->A error rates?
+                read_filter = int(read.is_good(min_enddist, max_mismatch)) 
+                mem_read_filter = int(mem_read.is_good(min_enddist, max_mismatch)) 
+
                 if read.allel != ref and mem_read.allel == ref:
-                    n_mismatch[read.allel] += 1
+                    n_mismatch[read_filter][read.allel] += 1
                     for A in ['A','C','G','T']:
                         if A == ref:
                             continue
-                        n_double[A] += 1
+                        n_double[read_filter][A] += 1
+                        n_double[mem_read_filter][A] += 1
                 if mem_read.allel != ref and read.allel == ref:
-                    n_mismatch[mem_read.allel] += 1
+
+                    n_mismatch[mem_read_filter][mem_read.allel] += 1
+
                     for A in ['A','C','G','T']:
                         if A == ref:
                             continue
-                        n_double[A] += 1
+                        n_double[read_filter][A] += 1
+                        n_double[mem_read_filter][A] += 1
+
         else:            
             reads_mem[read.query_name] = read
 
     # Handle reads without partner (ie. no overlap)
     for read in reads_mem.values():
         X = read.allel
-        if filter_reads and not read.is_good(min_enddist, max_mismatch):
-            continue
+        #if filter_reads and not read.is_good(min_enddist, max_mismatch):
+        #    continue
             
         if X == R:
             alts = [A for A in ['A','C','G','T'] if A!=R]
@@ -624,62 +638,65 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 n_neg[X] += 1
             else:
                 n_pos[X] += 1
-        
+
+        read_filter = int(read.is_good(min_enddist, max_mismatch))
         for A in alts:
-            events[A].append(("single", X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM))
+            events[A].append(("single", X, read_filter, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM))
         
-    new_correction_factor = defaultdict(dict)
+    new_correction_factor = {}
+    new_correction_factor[0] = defaultdict(dict)
+    new_correction_factor[1] = defaultdict(dict)
 
     #I only need to calculate probabilities of changing bases from one of the seen alleles.
     # I have to considder change to all bases to calculate stay types (X->X) correctly.
     relevant_bases = [ref] + list(seen_alt)
+    for read_filter in [0,1]:
+        for BQ in correction_factor:
+            new_correction_factor[read_filter][BQ]["single"] = defaultdict(dict)
+            new_correction_factor[read_filter][BQ]["double"] = defaultdict(dict)
 
-    for BQ in correction_factor:
-        new_correction_factor[BQ]["single"] = defaultdict(dict)
-        new_correction_factor[BQ]["double"] = defaultdict(dict)
+            for from_base in relevant_bases:
+                p_rest = 1.0
+                p_rest_double = 1.0
+                stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
+                for to_base in ['A', 'C', 'G', 'T']:
+                    if to_base == from_base:
+                        continue
+                    change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
+                    alpha, beta = correction_factor[read_filter][BQ][change_type][change_kmer]
+                    p_prior = alpha/(alpha+beta)
+                    a = p_prior * prior_N
+                    b = prior_N - a
+                    if no_update or from_base != ref:
+                        p_posterior = a/(a + b)
+                    else:
+                        p_posterior = (a + n_mismatch[read_filter][to_base])/(a + b + n_double[read_filter][to_base])
+                    p_rest -= p_posterior
+                    #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
+                    new_correction_factor[read_filter][BQ]["single"][change_type][change_kmer] = p2phred(p_posterior)
 
-        for from_base in relevant_bases:
-            p_rest = 1.0
-            p_rest_double = 1.0
-            stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
-            for to_base in ['A', 'C', 'G', 'T']:
-                if to_base == from_base:
-                    continue
-                change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                alpha, beta = correction_factor[BQ][change_type][change_kmer]
-                p_prior = alpha/(alpha+beta)
-                a = p_prior * prior_N
-                b = prior_N - a
-                if no_update or from_base != ref:
-                    p_posterior = a/(a + b)
-                else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                p_rest -= p_posterior
-                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                new_correction_factor[BQ]["single"][change_type][change_kmer] = p2phred(p_posterior)
-
-                p_prior_double = p_prior * double_adjustment
-                a = p_prior_double * prior_N
-                b = prior_N - a
-                if no_update or from_base != ref:
-                    p_posterior = a/(a + b)
-                else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                p_rest_double -= p_posterior
-                new_correction_factor[BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
-            
-            new_correction_factor[BQ]["single"][stay_type][stay_kmer] = p2phred(p_rest)
-            new_correction_factor[BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
+                    p_prior_double = p_prior * double_adjustment
+                    a = p_prior_double * prior_N
+                    b = prior_N - a
+                    if no_update or from_base != ref:
+                        p_posterior = a/(a + b)
+                    else:
+                        p_posterior = (a + n_mismatch[read_filter][to_base])/(a + b + n_double[read_filter][to_base])
+                    #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
+                    p_rest_double -= p_posterior
+                    new_correction_factor[read_filter][BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
+                
+                new_correction_factor[read_filter][BQ]["single"][stay_type][stay_kmer] = p2phred(p_rest)
+                new_correction_factor[read_filter][BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
 
     posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
     BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
     for A in seen_alt:
-        for overlap_type, X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM in events[A]:
+        for overlap_type, X, read_filter, read_BQ, read_MQ, enddist, has_indel, has_clip, NM in events[A]:
             muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
             muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-            posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
-            posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
+            posterior_from_A = new_correction_factor[read_filter][read_BQ][overlap_type][muttype_from_A][kmer_from_A]
+            posterior_from_R = new_correction_factor[read_filter][read_BQ][overlap_type][muttype_from_R][kmer_from_R]
 
             # if overlap_type == "single":
             #     posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
