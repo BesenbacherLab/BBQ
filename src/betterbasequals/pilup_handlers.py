@@ -774,7 +774,7 @@ def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correctio
                         if A == ref:
                             continue
                         n_double[A] += 1
-                        n_double_BQ[A][read.base_qual]
+                        n_double_BQ[A][read.base_qual] += 1
                 if mem_read.allel != ref and read.allel == ref:
                     n_mismatch[mem_read.allel] += 1
                     n_mismatch_BQ[mem_read.allel][mem_read.base_qual] += 1
@@ -782,7 +782,7 @@ def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correctio
                         if A == ref:
                             continue
                         n_double[A] += 1
-                        n_double_BQ[A][mem_read.base_qual]
+                        n_double_BQ[A][mem_read.base_qual] += 1
         else:            
             reads_mem[read.query_name] = read
 
