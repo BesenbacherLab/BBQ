@@ -181,8 +181,10 @@ class MutationCounterWFilter:
 
             # fetch read information
             read = Read(pileup_read)
-            if not read.is_good(self.min_enddist, self.max_mismatch):
-                continue
+
+            isGood = int(read.is_good(self.min_enddist, self.max_mismatch))
+            #if not 
+            #    continue
             
             # test if read is okay
             if (
@@ -200,10 +202,11 @@ class MutationCounterWFilter:
             if read.query_name in reads_mem:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
+                mem_isGood = int(mem_read.is_good(self.min_enddist, self.max_mismatch))
 
                 if read.allel == mem_read.allel:
-                    event_list.append(('good', read.allel, read.base_qual))
-                    event_list.append(('good', read.allel, mem_read.base_qual))
+                    event_list.append(('good', read.allel, read.base_qual, isGood))
+                    event_list.append(('good', read.allel, mem_read.base_qual, mem_isGood))
                     
                     if max(read.base_qual, mem_read.base_qual) > 30:
                         has_good.add(read.allel)
@@ -211,10 +214,10 @@ class MutationCounterWFilter:
                 else:
 
                     if read.allel != ref:
-                        event_list.append(('bad', read.allel, read.base_qual))
+                        event_list.append(('bad', read.allel, read.base_qual, isGood))
 
                     elif mem_read.allel != ref:
-                        event_list.append(('bad', mem_read.allel, mem_read.base_qual))
+                        event_list.append(('bad', mem_read.allel, mem_read.base_qual, mem_isGood))
             else:            
                 reads_mem[read.query_name] = read
 
@@ -244,12 +247,12 @@ class MutationCounterWFilter:
         if major[0] != ref:
             return
 
-        for event_type, allele, base_qual in event_list:
+        for event_type, allele, base_qual, isGood in event_list:
             mut_type = get_mut_type(ref, allele)     
 
             if event_type == 'good':
-                good_kmers[(base_qual, mut_type, kmer)] += 1
+                good_kmers[(isGood, base_qual, mut_type, kmer)] += 1
 
             elif event_type == 'bad':
-                bad_kmers[(base_qual, mut_type, kmer)] += 1
+                bad_kmers[(isGood, base_qual, mut_type, kmer)] += 1
 

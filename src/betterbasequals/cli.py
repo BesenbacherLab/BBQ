@@ -227,23 +227,31 @@ def run_get_good_and_bad_w_filter(opts):
     print_good_and_bad(opts, good_kmers, bad_kmers)
     
     #change format of dicts to nested dicts
-    BQs_good = set(x[0] for x in good_kmers)
-    BQs_bad = set(x[0] for x in bad_kmers)
+    BQs_good = set(x[1] for x in good_kmers)
+    BQs_bad = set(x[1] for x in bad_kmers)
     good_kmers2 = {}
+    good_kmers2[0] = {}
+    good_kmers2[1] = {}
     bad_kmers2 = {}
+    bad_kmers2[0] = {}
+    bad_kmers2[1] = {}
     for BQ in BQs_good | BQs_bad:
-        good_kmers2[BQ] = {}
+        good_kmers2[0][BQ] = {}
+        good_kmers2[1][BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
-            good_kmers2[BQ][mtype] = defaultdict(int)
-        bad_kmers2[BQ] = {}
+            good_kmers2[0][BQ][mtype] = defaultdict(int)
+            good_kmers2[1][BQ][mtype] = defaultdict(int)
+        bad_kmers2[0][BQ] = {}
+        bad_kmers2[1][BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-            bad_kmers2[BQ][mtype] = defaultdict(int)
+            bad_kmers2[0][BQ][mtype] = defaultdict(int)
+            bad_kmers2[1][BQ][mtype] = defaultdict(int)
     for tup, count in good_kmers.items():
-        BQ, mtype, kmer = tup
-        good_kmers2[BQ][mtype][kmer] = count
+        read_filter, BQ, mtype, kmer = tup
+        good_kmers2[read_filter][BQ][mtype][kmer] = count
     for tup, count in bad_kmers.items():
-        BQ, mtype, kmer = tup
-        bad_kmers2[BQ][mtype][kmer] = count
+        read_filter, BQ, mtype, kmer = tup
+        bad_kmers2[read_filter][BQ][mtype][kmer] = count
     return good_kmers2, bad_kmers2
 
 
@@ -252,53 +260,56 @@ def run_get_kmerpapas(opts, good_kmers, bad_kmers):
         eprint("Training kmer pattern partitions")
     kmer_papas = {}
 
-    for bqual in bad_kmers:
-        radius = len(next(iter(good_kmers[bqual]["C->T"].keys())))//2
-        kmer_papas[bqual] = {}
-        eprint(f'Handling base_qual: {bqual}')
-        for mtype in bad_kmers[bqual]:
-            if mtype[0] == mtype[-1]:
-                continue
-            eprint(f'Handling mutation type: {mtype}')
-            super_pattern = 'N'*radius + mtype[0] + 'N'*radius
-            eprint(mtype, end=" ")
-            if opts.correction_type == "bad_vs_good":
-                if opts.same_good:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][mtype][x])) for x in matches(super_pattern))
-                else:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
-            elif opts.correction_type == "bad_vs_no":
-                ref = mtype[0]
-                alt = mtype[-1]
-                notype = f'{ref}->{ref}'
-                other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
-                if opts.same_good:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][notype][x])) for x in matches(super_pattern))
-                else:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][notype][x] + bad_kmers[bqual][other_type1][x] + bad_kmers[bqual][other_type2][x])) for x in matches(super_pattern))
-            kpp = get_kmerpapa(super_pattern, contextD, opts)
-            kmer_papas[bqual][mtype] = {}
-            for pat in kpp:
-                alpha, beta = kpp[pat]
-                if not opts.output_file_kmerpapa is None:
-                    print(bqual, mtype, pat, alpha, beta, file=opts.output_file_kmerpapa)
-                if opts.verbosity > 1:
-                    eprint(bqual, mtype, pat, alpha, beta, -10*log10(alpha/(alpha+beta)))
-                for context in matches(pat):
-                    kmer_papas[bqual][mtype][context] = (alpha, beta)
-    
+    for read_filter in [0,1]:
+        kmer_papas[read_filter] = {}
+        for bqual in bad_kmers[read_filter]:
+            radius = len(next(iter(good_kmers[read_filter][bqual]["C->T"].keys())))//2
+            kmer_papas[read_filter][bqual] = {}
+            eprint(f'Handling base_qual: {bqual}')
+            for mtype in bad_kmers[read_filter][bqual]:
+                if mtype[0] == mtype[-1]:
+                    continue
+                eprint(f'Handling mutation type: {mtype}')
+                super_pattern = 'N'*radius + mtype[0] + 'N'*radius
+                eprint(mtype, end=" ")
+                if opts.correction_type == "bad_vs_good":
+                    if opts.same_good:
+                        contextD = dict((x, (bad_kmers[read_filter][bqual][mtype][x], good_kmers[read_filter][37][mtype][x])) for x in matches(super_pattern))
+                    else:
+                        contextD = dict((x, (bad_kmers[read_filter][bqual][mtype][x], good_kmers[read_filter][bqual][mtype][x])) for x in matches(super_pattern))
+                elif opts.correction_type == "bad_vs_no":
+                    ref = mtype[0]
+                    alt = mtype[-1]
+                    notype = f'{ref}->{ref}'
+                    other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
+                    if opts.same_good:
+                        contextD = dict((x, (bad_kmers[read_filter][bqual][mtype][x], good_kmers[read_filter][37][notype][x])) for x in matches(super_pattern))
+                    else:
+                        contextD = dict((x, (bad_kmers[read_filter][bqual][mtype][x], good_kmers[read_filter][bqual][notype][x] + bad_kmers[read_filter][bqual][other_type1][x] + bad_kmers[read_filter][bqual][other_type2][x])) for x in matches(super_pattern))
+                kpp = get_kmerpapa(super_pattern, contextD, opts)
+                kmer_papas[read_filter][bqual][mtype] = {}
+                for pat in kpp:
+                    alpha, beta = kpp[pat]
+                    if not opts.output_file_kmerpapa is None:
+                        print(read_filter, bqual, mtype, pat, alpha, beta, file=opts.output_file_kmerpapa)
+                    if opts.verbosity > 1:
+                        eprint(read_filter, bqual, mtype, pat, alpha, beta, -10*log10(alpha/(alpha+beta)))
+                    for context in matches(pat):
+                        kmer_papas[read_filter][bqual][mtype][context] = (alpha, beta)
+        
     if not opts.output_file_kmerpapa is None:
         opts.output_file_kmerpapa.close()
     
     return kmer_papas
 
 def phred_scale_kmerpapas(kmer_papas):
-    for bqual in kmer_papas:
-        for mtype in kmer_papas[bqual]:
-            for context in kmer_papas[bqual][mtype]:
-                alpha, beta = kmer_papas[bqual][mtype][context]
-                kmer_papas[bqual][mtype][context] = -10*log10(alpha/(alpha+beta))
-    
+    for read_filter in kmer_papas:
+        for bqual in kmer_papas:
+            for mtype in kmer_papas[read_filter][bqual]:
+                for context in kmer_papas[read_filter][bqual][mtype]:
+                    alpha, beta = kmer_papas[read_filter][bqual][mtype][context]
+                    kmer_papas[read_filter][bqual][mtype][context] = -10*log10(alpha/(alpha+beta))
+        
 def run_validation(opts, kmer_papas):
     if opts.verbosity > 0:
         eprint("Printing validation data")
@@ -389,6 +400,7 @@ def get_phred(tup):
     alpha, beta = tup
     return -10*log10(alpha /(alpha+beta))
  
+#TODO: include read_filter!
 def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
     for bqual in kmer_papas:
         for mtype in kmer_papas[bqual]:

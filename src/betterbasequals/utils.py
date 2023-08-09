@@ -251,26 +251,32 @@ def read_kmers(opts):
     if opts.verbosity > 0:
         eprint("Reading good and bad kmers")
     good_kmers = {}
+    good_kmers[0] = {}
+    good_kmers[1] = {}
     for line in opts.input_file_good:
-        bqual, mtype, kmer, count = line.split()
+        read_filter, bqual, mtype, kmer, count = line.split()
         bqual = int(bqual)
-        if bqual not in good_kmers:
-            good_kmers[bqual] = {}
+        read_filter = int(read_filter)
+        if bqual not in good_kmers[read_filter]:
+            good_kmers[read_filter][bqual] = {}
             for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
-                good_kmers[bqual][muttype] = defaultdict(int)
-        good_kmers[bqual][mtype][kmer] = int(count)
+                good_kmers[read_filter][bqual][muttype] = defaultdict(int)
+        good_kmers[read_filter][bqual][mtype][kmer] = int(count)
 
     bad_kmers = {}
+    bad_kmers[0] = {}
+    bad_kmers[1] = {}
     for line in opts.input_file_bad:
-        bqual, mtype, kmer, count = line.split()
+        read_filter, bqual, mtype, kmer, count = line.split()
         if count == "0":
             continue
         bqual = int(bqual)
-        if bqual not in bad_kmers:
-            bad_kmers[bqual] = {}
+        read_filter = int(read_filter)
+        if bqual not in bad_kmers[read_filter]:
+            bad_kmers[read_filter][bqual] = {}
             for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-                bad_kmers[bqual][muttype] = defaultdict(int)
-        bad_kmers[bqual][mtype][kmer] = int(count)
+                bad_kmers[read_filter][bqual][muttype] = defaultdict(int)
+        bad_kmers[read_filter][bqual][mtype][kmer] = int(count)
     return good_kmers, bad_kmers
 
 # def read_kmer_papas(opts):
@@ -300,41 +306,48 @@ def read_kmers(opts):
 
 def read_kmer_papas(opts):
     kmer_papas = {}
+    kmer_papas[0] = {}
+    kmer_papas[1] = {}
     for line in opts.input_file_kmerpapa:
-        bqual, mtype, pattern, alpha, beta = line.split()
+        read_filter, bqual, mtype, pattern, alpha, beta = line.split()
         alpha = float(alpha)
         beta = float(beta)
         bqual=int(bqual)
-        if bqual not in kmer_papas:
-            kmer_papas[bqual] = {}
-        if mtype not in kmer_papas[bqual]:
-            kmer_papas[bqual][mtype] = {}
+        read_filter = int(read_filter)
+        if bqual not in kmer_papas[read_filter]:
+            kmer_papas[read_filter][bqual] = {}
+        if mtype not in kmer_papas[read_filter][bqual]:
+            kmer_papas[read_filter][bqual][mtype] = {}
         for context in matches(pattern):
-            kmer_papas[bqual][mtype][context] = (alpha, beta)
+            kmer_papas[read_filter][bqual][mtype][context] = (alpha, beta)
     return kmer_papas
 
 def read_kmer_papas_for_test(opts):
     kmer_papas = {}
+    kmer_papas[0] = {}
+    kmer_papas[1] = {}
     for line in opts.input_file_kmerpapa:
-        bqual, mtype, pattern, alpha, beta = line.split()
+        read_filter, bqual, mtype, pattern, alpha, beta = line.split()
         alpha = float(alpha)
         beta = float(beta)
         bqual=int(bqual)
-        if bqual not in kmer_papas:
-            kmer_papas[bqual] = {}
-        if mtype not in kmer_papas[bqual]:
-            kmer_papas[bqual][mtype] = {}
-        kmer_papas[bqual][mtype][pattern] = p2phred(alpha/(alpha+beta))
+        read_filter = int(read_filter)
+        if bqual not in kmer_papas[read_filter]:
+            kmer_papas[read_filter][bqual] = {}
+        if mtype not in kmer_papas[read_filter][bqual]:
+            kmer_papas[read_filter][bqual][mtype] = {}
+        kmer_papas[read_filter][bqual][mtype][pattern] = p2phred(alpha/(alpha+beta))
     return kmer_papas
 
 
 def print_kmer_papas(opts, kmer_papas):
     if not opts.output_file_kmerpapa is None:
-        for bqual in kmer_papas:
-            for mtype in kmer_papas[bqual]:
-                for pat in kmer_papas[bqual][mtype]:
-                    Q = kmer_papas[bqual][mtype][pat]
-                    print(bqual, mtype, pat, Q, file=opts.output_file_kmerpapa)
+        for read_filter in kmer_papas:
+            for bqual in kmer_papas:
+                for mtype in kmer_papas[bqual]:
+                    for pat in kmer_papas[bqual][mtype]:
+                        Q = kmer_papas[bqual][mtype][pat]
+                        print(read_filter, bqual, mtype, pat, Q, file=opts.output_file_kmerpapa)
         opts.output_file_kmerpapa.close()
 
 # def print_good_and_bad(opts, good_kmers, bad_kmers):
@@ -356,13 +369,13 @@ def print_kmer_papas(opts, kmer_papas):
 def print_good_and_bad(opts, good_kmers, bad_kmers):
     if not opts.output_file_good is None:
         for tup, count in good_kmers.items():
-            bqual, mtype, kmer = tup
-            print(bqual, mtype, kmer, count , file = opts.output_file_good)
+            read_filter, bqual, mtype, kmer = tup
+            print(read_filter, bqual, mtype, kmer, count , file = opts.output_file_good)
         opts.output_file_good.close()
     if not opts.output_file_bad is None:
         for tup, count in bad_kmers.items():
-            bqual, mtype, kmer = tup
-            print(bqual, mtype, kmer, count , file = opts.output_file_bad)
+            read_filter, bqual, mtype, kmer = tup
+            print(read_filter, bqual, mtype, kmer, count , file = opts.output_file_bad)
         opts.output_file_bad.close()
 
 def parse_opts_region(opts):
