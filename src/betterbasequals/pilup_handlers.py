@@ -555,6 +555,9 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
             # We do not trust mismathces in overlaps so we only add to events list in case of match
             if read.allel == mem_read.allel:
                 X = read.allel
+                if X == R:
+                    for a in [A for A in ['A','C','G','T'] if A!=R]:
+                        n_double[a] += 1
 
                 if filter_reads:
                     if (not read.is_good()) and mem_read.is_good():
@@ -578,7 +581,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
 
                 for A in alts:
                     #if not no_update:   
-                    n_double[A] += 1
+                    #n_double[A] += 1
 
                     read_MQ = (read.mapq + mem_read.mapq)/2
                     #if overlap_type == "double":
