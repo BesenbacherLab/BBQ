@@ -515,10 +515,6 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     The probabilities are given on phred scale.
     We only considder reads where X_read_i == A or X_read_i == R.
     """
-    print(correction_factor.keys())
-    print(correction_factor[0].keys())
-    print(correction_factor[1].keys())
-
     reads_mem = {}
     seen_alt = set()
     n_mismatch = {}
@@ -654,7 +650,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     # I have to considder change to all bases to calculate stay types (X->X) correctly.
     relevant_bases = [ref] + list(seen_alt)
     for read_filter in [0,1]:
-        for BQ in correction_factor:
+        for BQ in correction_factor[read_filter]:
             new_correction_factor[read_filter][BQ]["single"] = defaultdict(dict)
             new_correction_factor[read_filter][BQ]["double"] = defaultdict(dict)
 
