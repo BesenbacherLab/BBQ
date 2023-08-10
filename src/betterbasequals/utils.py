@@ -142,11 +142,19 @@ class Read:
         self.NM = cigar_stats[10]
         #print(pileup_read.alignment.get_cigar_stats())
     
-    def is_good(self, min_enddist=6, max_mismatch = 2):
+    # Split filter. We split quality base on this.
+    def is_good(self, min_enddist=6):
+        return (self.NM <= 1 and
+                not self.has_clip and
+                self.enddist >= min_enddist and
+                self.mapq >= 60
+                )
+    
+    # Hard filter. Reads that fail this are ignored.
+    def is_usable(self, max_mismatch = 3):
         return (self.NM <= max_mismatch and
                 not self.has_indel and
-                not self.has_clip and
-                self.enddist >= min_enddist)
+                self.enddist >= 1)
 
 
 class ReadPair:

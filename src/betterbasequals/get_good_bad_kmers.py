@@ -182,7 +182,10 @@ class MutationCounterWFilter:
             # fetch read information
             read = Read(pileup_read)
 
-            isGood = int(read.is_good(self.min_enddist, self.max_mismatch))
+            if not read.is_usable(self.max_mismatch):
+                continue
+
+            isGood = int(read.is_good(self.min_enddist))
             #if not 
             #    continue
             
@@ -202,7 +205,7 @@ class MutationCounterWFilter:
             if read.query_name in reads_mem:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
-                mem_isGood = int(mem_read.is_good(self.min_enddist, self.max_mismatch))
+                mem_isGood = int(mem_read.is_good(self.min_enddist))
 
                 if read.allel == mem_read.allel:
                     event_list.append(('good', read.allel, read.base_qual, isGood))

@@ -537,6 +537,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         # fetch read information
         read = Read(pileup_read)
 
+        if not read.is_usable(max_mismatch):
+            continue
         #if filter_reads and not read.is_good():
         #    continue
 
@@ -559,11 +561,11 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 X = read.allel
 
                 if filter_reads:
-                    if (not read.is_good(min_enddist, max_mismatch)) and mem_read.is_good(min_enddist, max_mismatch):
+                    if (not read.is_good(min_enddist)) and mem_read.is_good(min_enddist):
                         #considder mem_read single read.
                         reads_mem[read.query_name] = mem_read
                         continue
-                    elif (not mem_read.is_good(min_enddist, max_mismatch)) and read.is_good(min_enddist, max_mismatch):
+                    elif (not mem_read.is_good(min_enddist)) and read.is_good(min_enddist):
                         #considder read single read.
                         reads_mem[read.query_name] = read
                         continue
@@ -578,7 +580,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                     n_pos[X] += 1
                     n_neg[X] += 1
 
-                read_filter = int(read.is_good(min_enddist, max_mismatch)) # read and mem_read should have same filter status
+                read_filter = int(read.is_good(min_enddist)) # read and mem_read should have same filter status
                 read_MQ = (read.mapq + mem_read.mapq)/2
                 #if overlap_type == "double":
                 read_BQ = max(read.base_qual, mem_read.base_qual)
@@ -598,8 +600,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 #if not no_update:
                 # TODO: Would it make sense to also count ref_mismatches so that we could
                 # do bayesian update of A->R error rates and not only R->A error rates?
-                read_filter = int(read.is_good(min_enddist, max_mismatch)) 
-                mem_read_filter = int(mem_read.is_good(min_enddist, max_mismatch)) 
+                read_filter = int(read.is_good(min_enddist)) 
+                mem_read_filter = int(mem_read.is_good(min_enddist)) 
 
                 if read.allel != ref and mem_read.allel == ref:
                     n_mismatch[read_filter][read.allel] += 1
@@ -621,6 +623,10 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         else:            
             reads_mem[read.query_name] = read
 
+    for A in ['A','C','G','T']:
+        n_mismatch[0][A] += n_mismatch[1][A]
+        n_double[0][A] += n_mismatch[1][A]
+
     # Handle reads without partner (ie. no overlap)
     for read in reads_mem.values():
         X = read.allel
@@ -638,7 +644,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
             else:
                 n_pos[X] += 1
 
-        read_filter = int(read.is_good(min_enddist, max_mismatch))
+        read_filter = int(read.is_good(min_enddist))
         for A in alts:
             events[A].append(("single", X, read_filter, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM))
         
