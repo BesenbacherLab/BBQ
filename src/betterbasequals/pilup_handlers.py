@@ -515,6 +515,9 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     The probabilities are given on phred scale.
     We only considder reads where X_read_i == A or X_read_i == R.
     """
+    print(correction_factor.keys())
+    print(correction_factor[0].keys())
+    print(correction_factor[1].keys())
 
     reads_mem = {}
     seen_alt = set()
