@@ -520,6 +520,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     seen_alt = set()
     n_mismatch = Counter()
     n_double = Counter()
+    n_overlap = 0
     n_pos = Counter()
     n_neg = Counter()
     events = {'A':[], 'C':[], 'G':[], 'T':[]}
@@ -550,10 +551,12 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
         if read.query_name in reads_mem:
             # found partner process read pair
             mem_read = reads_mem.pop(read.query_name)
-
+            n_overlap += 1
             # We do not trust mismathces in overlaps so we only add to events list in case of match
             if read.allel == mem_read.allel:
                 X = read.allel
+
+                n_double[X] += 1
 
                 if filter_reads:
                     if (not read.is_good(min_enddist, max_mismatch)) and mem_read.is_good(min_enddist, max_mismatch):
@@ -575,10 +578,9 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                     n_pos[X] += 1
                     n_neg[X] += 1
 
-                for A in alts:
-                    #if not no_update:   
-                    n_double[A] += 1
 
+                for A in alts:
+                    #if not no_update:
                     read_MQ = (read.mapq + mem_read.mapq)/2
                     #if overlap_type == "double":
                     read_BQ = max(read.base_qual, mem_read.base_qual)
@@ -593,18 +595,20 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 #if not no_update:
                 # TODO: Would it make sense to also count ref_mismatches so that we could
                 # do bayesian update of A->R error rates and not only R->A error rates?
-                if read.allel != ref and mem_read.allel == ref:
-                    n_mismatch[read.allel] += 1
-                    for A in ['A','C','G','T']:
-                        if A == ref:
-                            continue
-                        n_double[A] += 1
-                if mem_read.allel != ref and read.allel == ref:
-                    n_mismatch[mem_read.allel] += 1
-                    for A in ['A','C','G','T']:
-                        if A == ref:
-                            continue
-                        n_double[A] += 1
+                n_mismatch[read.allel] += 1
+                n_mismatch[mem_read.allel] += 1
+                #if read.allel != ref and mem_read.allel == ref:
+                #    n_mismatch[read.allel] += 1
+                    #for A in ['A','C','G','T']:
+                    #    if A == ref:
+                    #        continue
+                    #    n_double[A] += 1
+                #if mem_read.allel != ref and read.allel == ref:
+                #    n_mismatch[mem_read.allel] += 1
+                    #for A in ['A','C','G','T']:
+                    #    if A == ref:
+                    #        continue
+                    #    n_double[A] += 1
         else:            
             reads_mem[read.query_name] = read
 
@@ -650,10 +654,12 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 p_prior = alpha/(alpha+beta)
                 a = p_prior * prior_N
                 b = prior_N - a
-                if no_update or from_base != ref:
+                #if no_update or from_base != ref:
+                if no_update:
                     p_posterior = a/(a + b)
                 else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                    p_posterior = n_mismatch[to_base] / (2 * n_overlap)
+                #(a + n_mismatch[to_base])/(a + b + n_double[to_base])
                 p_rest -= p_posterior
                 #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                 new_correction_factor[BQ]["single"][change_type][change_kmer] = p2phred(p_posterior)
@@ -661,10 +667,12 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 p_prior_double = p_prior * double_adjustment
                 a = p_prior_double * prior_N
                 b = prior_N - a
-                if no_update or from_base != ref:
+                #if no_update or from_base != ref:
+                if no_update:
                     p_posterior = a/(a + b)
                 else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                    p_posterior = n_mismatch[to_base] / (2 * n_overlap)
+                    #p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                 #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                 p_rest_double -= p_posterior
                 new_correction_factor[BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
