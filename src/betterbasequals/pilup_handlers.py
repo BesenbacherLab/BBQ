@@ -654,8 +654,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 p_prior = alpha/(alpha+beta)
                 a = p_prior * prior_N
                 b = prior_N - a
-                #if no_update or from_base != ref:
-                if no_update:
+                if no_update or from_base != ref:
+                #if no_update:
                     p_posterior = a/(a + b)
                 else:
                     p_posterior = (a + n_mismatch[to_base]) / (a + b +(2 * n_overlap))                    
@@ -668,8 +668,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 p_prior_double = p_prior * double_adjustment
                 a = p_prior_double * prior_N
                 b = prior_N - a
-                #if no_update or from_base != ref:
-                if no_update:
+                if no_update or from_base != ref:
+                #if no_update:
                     p_posterior = a/(a + b)
                 else:
                     p_posterior = (a + n_mismatch[to_base]) / (a + b +(2 * n_overlap))
