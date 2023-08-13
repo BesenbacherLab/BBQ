@@ -658,7 +658,8 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 if no_update:
                     p_posterior = a/(a + b)
                 else:
-                    p_posterior = n_mismatch[to_base] / (2 * n_overlap)
+                    p_posterior = (a + n_mismatch[to_base]) / (a + b +(2 * n_overlap))                    
+                    #p_posterior = n_mismatch[to_base] / (2 * n_overlap)
                 #(a + n_mismatch[to_base])/(a + b + n_double[to_base])
                 p_rest -= p_posterior
                 #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
@@ -671,7 +672,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 if no_update:
                     p_posterior = a/(a + b)
                 else:
-                    p_posterior = n_mismatch[to_base] / (2 * n_overlap)
+                    p_posterior = (a + n_mismatch[to_base]) / (a + b +(2 * n_overlap))
                     #p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                 #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                 p_rest_double -= p_posterior
