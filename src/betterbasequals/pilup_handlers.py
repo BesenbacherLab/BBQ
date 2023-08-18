@@ -587,7 +587,10 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                     has_clip = max(read.has_clip, mem_read.has_clip)
                     NM = max(read.NM, mem_read.NM)
                     #(read.base_qual, mem_read.base_qual)
-                    events[A].append(("double", X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM))
+                    if read_BQ == 37 and read.base_qual == mem_read.base_qual:
+                        events[A].append(("double", X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM))
+                    else:
+                        events[A].append(("single", X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM))
 
             else: # Mismatch
                 #if not no_update:
