@@ -309,11 +309,12 @@ class SomaticMutationCaller:
                 #p_val = scipy.stats.chi2.sf(-2*LR, 2)
                 #if p_val < self.cutoff:
                 if QUAL > 0:
-                    oldBQ = '[' + ','.join(x[0] for x in BQs[A]) + ']'
+                    oldBQ_str = '[' + ','.join(x[-1] for x in BQs[A]) + ']'
                     newBQ = '[' +','.join(f'{x[1]:.1f}' for x in BQs[A]) + ']'
                     
-                    oldBQ_str = str(oldBQ)
+                    oldBQ = [x[0] for x in BQs[A]]
                     oldBQ.sort()
+                    
                     medianBQ=oldBQ[len(oldBQ)//2]
                     
                     n37 = sum(x[0]==37 for x in BQs[A])
