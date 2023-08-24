@@ -696,7 +696,7 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
 
             posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
             if A==X:
-                BQs[A].append((BQ_pair, posterior_from_R, enddist, has_indel, has_clip, NM))
+                BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
                     
     return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
 
