@@ -309,7 +309,7 @@ class SomaticMutationCaller:
                 #p_val = scipy.stats.chi2.sf(-2*LR, 2)
                 #if p_val < self.cutoff:
                 if QUAL > 0:
-                    oldBQ = [x[0] for x in BQs[A]]
+                    oldBQ = '[' + ','.join(x[0] for x in BQs[A]) + ']'
                     newBQ = '[' +','.join(f'{x[1]:.1f}' for x in BQs[A]) + ']'
                     
                     oldBQ_str = str(oldBQ)
