@@ -382,7 +382,10 @@ def run_call(opts, kmer_papas):
         n_calls = caller.call_mutations(opts.chrom, opts.start, opts.end)
 
     if opts.verbosity > 0:
-        eprint(f'Found {n_calls} variants with a p-value less than {opts.cutoff}.')
+        if opts.cutoff is None:
+            eprint(f'Found {n_calls} possible variants.')
+        else:
+            eprint(f'Found {n_calls} variants with a quality above {opts.cutoff}.')
     
 
 def get_phred(tup):
