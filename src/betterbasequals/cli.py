@@ -113,8 +113,8 @@ def get_parser():
     call_parent.add_argument('--method', type=str,
         choices=['LR', 'LR_with_MQ', 'poisson', 'BF'], default="LR",
         help="Method used to calculate variant quality scores")
-    call_parent.add_argument('--cutoff', type=float, default=0.001,
-        help="initial variant calling p-value cutoff")
+    call_parent.add_argument('--cutoff', type=float, default=None, metavar='Q',
+        help="Only print variants with quality above Q.")
     call_parent.add_argument('--prior_N', type=float, default=100,
         help="Weight (as sample size) of the kmer based prior on error rate.")
     call_parent.add_argument('--no_update',  action='store_true',
