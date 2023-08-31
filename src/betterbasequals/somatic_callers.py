@@ -1,9 +1,9 @@
 import py2bit
 from scipy.optimize import minimize_scalar
-from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader
-from betterbasequals.pilup_handlers import get_alleles_w_probabities_update
-from collections import Counter
+from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read
+from collections import Counter, defaultdict
 import scipy.stats
+import math
 
 def GQ_sum(alt_BQs, ref_BQs):
     return sum(alt_BQs)
@@ -109,6 +109,7 @@ class SomaticMutationCaller:
         pop_vcf = None,
         min_enddist = 6,
         max_mismatch = 2,
+        mean_type = "arithmetric",
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
@@ -131,6 +132,17 @@ class SomaticMutationCaller:
 
         self.outfile = outfile
         self.method = method
+
+        self.BQ_freq = {}
+        for BQ in kmer_papa:
+            self.BQ_freq[BQ] = 0
+            for muttype in kmer_papa[BQ]:
+                for kmer in kmer_papa[BQ][muttype]:
+                    a,b  = kmer_papa[BQ][muttype][kmer]
+                    self.BQ_freq[BQ] += a + b
+        total_sum = sum(self.BQ_freq.values())
+        for BQ in kmer_papa:
+            self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
 
         #This should be handled in pileup code now.
         #if self.method == 'LR':
@@ -160,6 +172,7 @@ class SomaticMutationCaller:
 
         self.min_enddist = min_enddist
         self.max_mismatch = max_mismatch
+        self.mean_type = mean_type
         self.mapq = mapq
         self.min_base_qual = min_base_qual
         self.filter_mapq = filter_mapq
@@ -168,7 +181,8 @@ class SomaticMutationCaller:
         self.max_depth = max_depth
         self.radius = radius
         self.prefix = prefix
-        self.filter = False
+        self.filter_variants = False
+        self.filter_reads = True
 
 
         #TODO: filter_depth variable should be set based on average coverage in filter file.
@@ -269,7 +283,7 @@ class SomaticMutationCaller:
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
         elif self.method in ['LR','LR_with_MQ']:
             base_probs, BQs, n_mismatch, n_double, n_pos, n_neg = \
-                get_alleles_w_probabities_update(pileupcolumn, ref, kmer, self.mut_probs, self.prior_N, self.no_update, self.double_adjustment, self.min_enddist, self.max_mismatch)
+                self.get_alleles_w_probabities_update(pileupcolumn, ref, kmer)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
             #no_filter_base_probs, no_filter_BQs, no_filter_n_mismatch, no_filter_n_double, no_filter_n_pos, no_filter_n_neg = \
@@ -294,7 +308,7 @@ class SomaticMutationCaller:
                 medianMQ=altMQs[len(altMQs)//2]
                 
                 if medianMQ < 30:
-                    if self.filter:
+                    if self.filter_variants:
                         continue
                     else:
                         F_list.append("lowMQ")
@@ -316,7 +330,7 @@ class SomaticMutationCaller:
                     n37 = sum(x[0]==37 for x in BQs[A])
 
                     if medianBQ < 20:
-                        if self.filter:
+                        if self.filter_variants:
                             continue
                         else:
                             F_list.append("lowBQ")
@@ -327,7 +341,7 @@ class SomaticMutationCaller:
                     median_enddist = enddist[len(enddist)//2]
 
                     if median_enddist <= 1:
-                        if self.filter:
+                        if self.filter_variants:
                             continue
                         else:
                             F_list.append("lowEndDist")
@@ -361,4 +375,226 @@ class SomaticMutationCaller:
                     print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other}{optional_info}', file=self.outfile)
 
         return n_calls
+    
+    def get_alleles_w_probabities_update(self, pileupcolumn, ref, ref_kmer):
+        """
+        Returns a dictionary that maps from allele A to a list of tuples with probability of 
+        observing Alt allele A given then read and probability of observing ref allele R given 
+        the read. I.e.: base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
+        The probabilities are given on phred scale.
+        We only considder reads where X_read_i == A or X_read_i == R.
+        """
+
+        reads_mem = {}
+        seen_alt = set()
+        n_mismatch = Counter()
+        n_double = Counter()
+        n_pos = Counter()
+        n_neg = Counter()
+        events = {'A':[], 'C':[], 'G':[], 'T':[]}
+        double_combinations = set()
+        R = ref
+        for pileup_read in pileupcolumn.pileups:
+            # test for deletion at pileup
+            if pileup_read.is_del or pileup_read.is_refskip:
+                continue
+            #TODO: should consider what the right solution is if there is deletion at overlap
+
+            # fetch read information
+            read = Read(pileup_read)
+
+            #if filter_reads and not read.is_good():
+            #    continue
+
+            # test if read is okay
+            if (
+                read.allel not in "ATGC"
+                or read.start is None
+                or read.end is None
+            ):
+                continue
+
+
+            # Look for read partner
+            if read.query_name in reads_mem:
+                # found partner process read pair
+                mem_read = reads_mem.pop(read.query_name)
+
+                # We do not trust mismathces in overlaps so we only add to events list in case of match
+                if read.allel == mem_read.allel:
+                    X = read.allel
+
+                    if self.filter_reads:
+                        if (not read.is_good(self.min_enddist, self.max_mismatch)) and mem_read.is_good(self.min_enddist, self.max_mismatch):
+                            #considder mem_read single read.
+                            reads_mem[read.query_name] = mem_read
+                            continue
+                        elif (not mem_read.is_good(self.min_enddist, self.max_mismatch)) and read.is_good(self.min_enddist, self.max_mismatch):
+                            #considder read single read.
+                            reads_mem[read.query_name] = read
+                            continue
+                        elif (not read.is_good(self.min_enddist, self.max_mismatch)) and (not mem_read.is_good(self.min_enddist, self.max_mismatch)):
+                            continue
+
+                    if X == R:
+                        alts = [A for A in ['A','C','G','T'] if A!=R]
+                    else:
+                        alts = [X]
+                        seen_alt.add(X)
+                        n_pos[X] += 1
+                        n_neg[X] += 1
+
+                    for A in alts:
+                        #if not no_update:   
+                        n_double[A] += 1
+
+                        read_MQ = (read.mapq + mem_read.mapq)/2
+                        #if overlap_type == "double":
+                        
+                        if read.base_qual > mem_read.base_qual:
+                            read_BQ = (read.base_qual, mem_read.base_qual)
+                            BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
+                        else:
+                            read_BQ = (mem_read.base_qual, read.base_qual)
+                            BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
+                        double_combinations.add(read_BQ)
+                        enddist = max(read.enddist, mem_read.enddist)
+                        has_indel = max(read.has_indel, mem_read.has_indel)
+                        has_clip = max(read.has_clip, mem_read.has_clip)
+                        NM = max(read.NM, mem_read.NM)
+                        #(read.base_qual, mem_read.base_qual)
+                        events[A].append((X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair))
+
+                else: # Mismatch
+                    #if not no_update:
+                    # TODO: Would it make sense to also count ref_mismatches so that we could
+                    # do bayesian update of A->R error rates and not only R->A error rates?
+                    if read.allel != ref and mem_read.allel == ref:
+                        n_mismatch[read.allel] += 1
+                        for A in ['A','C','G','T']:
+                            if A == ref:
+                                continue
+                            n_double[A] += 1
+                    if mem_read.allel != ref and read.allel == ref:
+                        n_mismatch[mem_read.allel] += 1
+                        for A in ['A','C','G','T']:
+                            if A == ref:
+                                continue
+                            n_double[A] += 1
+            else:            
+                reads_mem[read.query_name] = read
+
+        # Handle reads without partner (ie. no overlap)
+        for read in reads_mem.values():
+            X = read.allel
+            if self.filter_reads and not read.is_good(self.min_enddist, self.max_mismatch):
+                continue
+                
+            if X == R:
+                alts = [A for A in ['A','C','G','T'] if A!=R]
+            else:
+
+                alts = [X]
+                seen_alt.add(X)
+                if read.is_reverse:
+                    n_neg[X] += 1
+                else:
+                    n_pos[X] += 1
+            
+            for A in alts:
+                events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
+            
+        new_mut_probs = defaultdict(dict)
+
+        #I only need to calculate probabilities of changing bases from one of the seen alleles.
+        # I have to considder change to all bases to calculate stay types (X->X) correctly.
+        relevant_bases = [ref] + list(seen_alt)
+
+        # calculate error probabilities for single reads:
+        for BQ in self.mut_probs:
+            new_mut_probs[BQ] = defaultdict(dict)
+
+            for from_base in relevant_bases:
+                p_rest = 1.0
+                stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
+                for to_base in ['A', 'C', 'G', 'T']:
+                    if to_base == from_base:
+                        continue
+                    change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
+                    alpha, beta = self.mut_probs[BQ][change_type][change_kmer]
+                    p_prior = alpha/(alpha+beta)
+                    new_p_prior = 0
+                    for other_BQ in self.mut_probs:
+                        other_alpha, other_beta = self.mut_probs[BQ][change_type][change_kmer]
+                        other_p_prior = other_alpha/(other_alpha, other_beta)
+                        if self.mean_type == "geometric":
+                            new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
+                        elif self.mean_type == "arithmetric":
+                            new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
+
+                    a = new_p_prior * self.prior_N
+                    b = self.prior_N - a
+                    if self.no_update or from_base != ref:
+                        p_posterior = a/(a + b)
+                    else:
+                        p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                    p_rest -= p_posterior
+                    #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
+                    new_mut_probs[BQ][change_type][change_kmer] = p2phred(p_posterior)
+                new_mut_probs[BQ][stay_type][stay_kmer] = p2phred(p_rest)
+    
+
+        # calculate error rates for double reads:
+        for BQ1, BQ2 in double_combinations:
+            new_mut_probs[(BQ1,BQ2)] = defaultdict(dict)
+
+            for from_base in relevant_bases:
+                p_rest = 1.0
+                stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
+                for to_base in ['A', 'C', 'G', 'T']:
+                    if to_base == from_base:
+                        continue
+                    change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
+
+                    alpha1, beta1 = self.mut_probs[BQ1][change_type][change_kmer]
+                    alpha2, beta2 = self.mut_probs[BQ2][change_type][change_kmer]
+                
+                    p_prior_1 = alpha1/(alpha1+beta1)
+                    p_prior_2 = alpha2/(alpha2+beta2)
+
+                    if self.mean_type == "geometric":
+                        new_p_prior = math.sqrt(p_prior_1*p_prior_2)
+                    elif self.mean_type == "arithmetric":
+                        new_p_prior = ((p_prior_1+p_prior_2)/2)
+
+                    a = new_p_prior * self.prior_N
+                    b = self.prior_N - a
+                    if self.no_update or from_base != ref:
+                        p_posterior = a/(a + b)
+                    else:
+                        p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                    p_rest -= p_posterior
+                    #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
+                    new_mut_probs[(BQ1,BQ2)][change_type][change_kmer] = p2phred(p_posterior)
+                new_mut_probs[(BQ1,BQ2)][stay_type][stay_kmer] = p2phred(p_rest)    
+
+
+        posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
+        BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
+        for A in seen_alt:
+            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair in events[A]:
+                muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
+                muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
+                posterior_from_A = new_mut_probs[read_BQ][muttype_from_A][kmer_from_A]
+                posterior_from_R = new_mut_probs[read_BQ][muttype_from_R][kmer_from_R]
+
+                posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
+                if A==X:
+                    if type(read_BQ) == "tuple":
+                        BQ1, BQ2 = read_BQ
+                        read_BQ = max(BQ1,BQ2)
+                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
+                
+        return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
+
 

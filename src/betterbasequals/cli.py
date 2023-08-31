@@ -129,6 +129,9 @@ def get_parser():
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
     call_parent.add_argument("--pop_vcf", type=str,
         help='Population vcf with AF field.')
+    call_parent.add_argument('--mean_type', type=str,
+        choices=['arithmetric', 'geometric'], default="arithmetric",
+        help="How to calculate the mean error probabilty of two matching overlapping alleles")
     
 
     count_parser = subparsers.add_parser('count', 
@@ -374,7 +377,8 @@ def run_call(opts, kmer_papas):
             opts.filter_max_count,
             opts.pop_vcf,
             opts.min_enddist,
-            opts.max_mismatch
+            opts.max_mismatch,
+            opts.mean_type
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()

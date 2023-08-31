@@ -28,6 +28,15 @@ def empirical_bayes(a, b, x, N):
     return (a+x)/(a+b+N)
     #return p2phred(a+x) - p2phred(a+b+N)
 
+ostrand = {'A':'T', 'C':'G', 'G':'C', 'T':'A'}
+def mut_type(from_base, to_base, kmer):
+    center = len(kmer)//2
+    new_kmer = kmer[:center] + from_base + kmer[center+1:]
+    if from_base in ['G','T']:
+        return f'{ostrand[from_base]}->{ostrand[to_base]}', reverse_complement(new_kmer)
+    else:
+        return f'{from_base}->{to_base}', new_kmer
+
 
 def get_average_coverage(bamfile):
     """Quickly calculates the average coverage of a WGS bamfile using the bam index.

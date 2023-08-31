@@ -1,5 +1,6 @@
 from collections import Counter, defaultdict
-from betterbasequals.utils import Read, ReadPair, reverse_complement, phred2p, p2phred
+from betterbasequals.utils import Read, ReadPair, reverse_complement, phred2p, p2phred, mut_type
+import math
 
 def get_mut_type(ref, papa_ref, alt):
     if ref != papa_ref:
@@ -7,15 +8,6 @@ def get_mut_type(ref, papa_ref, alt):
     else:
         mtype = papa_ref + '->' + alt
     return mtype
-
-ostrand = {'A':'T', 'C':'G', 'G':'C', 'T':'A'}
-def mut_type(from_base, to_base, kmer):
-    center = len(kmer)//2
-    new_kmer = kmer[:center] + from_base + kmer[center+1:]
-    if from_base in ['G','T']:
-        return f'{ostrand[from_base]}->{ostrand[to_base]}', reverse_complement(new_kmer)
-    else:
-        return f'{from_base}->{to_base}', new_kmer
 
 
 def get_pileup_count(pileupcolumn, ref, min_base_qual, blood=False):
@@ -638,9 +630,9 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
     # I have to considder change to all bases to calculate stay types (X->X) correctly.
     relevant_bases = [ref] + list(seen_alt)
 
+    # calculate error probabilities for single reads:
     for BQ in correction_factor:
-        new_correction_factor[BQ]["single"] = defaultdict(dict)
-        new_correction_factor[BQ]["double"] = defaultdict(dict)
+        new_correction_factor[BQ] = defaultdict(dict)
 
         for from_base in relevant_bases:
             p_rest = 1.0
@@ -652,6 +644,11 @@ def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_fac
                 change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
                 alpha, beta = correction_factor[BQ][change_type][change_kmer]
                 p_prior = alpha/(alpha+beta)
+                new_p_prior = 0
+                for other_BQ in correction_factor:
+                    other_alpha, other_beta = correction_factor[BQ][change_type][change_kmer]
+                    other_p_prior = other_alpha/(other_alpha, other_beta)
+                    new_p_prior += BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
                 a = p_prior * prior_N
                 b = prior_N - a
                 if no_update or from_base != ref:
@@ -810,12 +807,10 @@ def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correctio
     relevant_bases = [ref] + list(seen_alt)
 
     for BQ in correction_factor:
-        new_correction_factor[BQ]["single"] = defaultdict(dict)
-        new_correction_factor[BQ]["double"] = defaultdict(dict)
+        new_correction_factor[BQ] = defaultdict(dict)
 
         for from_base in relevant_bases:
             p_rest = 1.0
-            p_rest_double = 1.0
             stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
             for to_base in ['A', 'C', 'G', 'T']:
                 if to_base == from_base:
@@ -823,6 +818,11 @@ def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correctio
                 change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
                 alpha, beta = correction_factor[BQ][change_type][change_kmer]
                 p_prior = alpha/(alpha+beta)
+                new_p_prior = 0
+                for other_BQ in correction_factor:
+                    other_alpha, other_beta = correction_factor[BQ][change_type][change_kmer]
+                    other_p_prior = other_alpha/(other_alpha, other_beta)
+                    new_p_prior += BQ_freq[BQ] * 
                 a = p_prior * prior_N
                 b = prior_N - a
                 if no_update:
@@ -830,22 +830,41 @@ def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correctio
                 else: 
                     p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                 p_rest -= p_posterior
-                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                new_correction_factor[BQ]["single"][change_type][change_kmer] = p2phred(p_posterior)
+                
+                new_correction_factor[BQ][change_type][change_kmer] = p2phred(p_posterior)
+           
+            new_correction_factor[BQ][stay_type][stay_kmer] = p2phred(p_rest)
+ 
+    # calculate error rates for double reads:
+    for BQ1, BQ2 in double_combinations:
+        new_correction_factor[(BQ1,BQ2)] = defaultdict(dict)
+        for from_base in relevant_bases:
+            p_rest = 1.0
+            stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
+            for to_base in ['A', 'C', 'G', 'T']:
+                if to_base == from_base:
+                    continue
+                change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
+                alpha1, beta1 = correction_factor[BQ1][change_type][change_kmer]
+                alpha2, beta2 = correction_factor[BQ2][change_type][change_kmer]
+                
+                p_prior_1 = alpha1/(alpha1+beta1)
+                p_prior_2 = alpha2/(alpha2+beta2)
 
-                p_prior_double = p_prior * double_adjustment
+                p_prior_double = math.exp(math.log(p_prior_1)/double_adjustment) * p_prior_2
                 a = p_prior_double * prior_N
                 b = prior_N - a
-                if no_update:
+                if no_update or from_base != ref:
                     p_posterior = a/(a + b)
                 else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                    p_posterior = (a + n_mismatch)/(a + b + n_double)
+                    #p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                 #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                p_rest_double -= p_posterior
-                new_correction_factor[BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
-            
-            new_correction_factor[BQ]["single"][stay_type][stay_kmer] = p2phred(p_rest)
-            new_correction_factor[BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
+                p_rest -= p_posterior
+                new_correction_factor[(BQ1, BQ2)][change_type][change_kmer] = p2phred(p_posterior)
+            new_correction_factor[(BQ1, BQ2)][stay_type][change_kmer] = p2phred(p_rest)
+
+
 
     posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
     BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
