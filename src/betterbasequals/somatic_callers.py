@@ -522,11 +522,11 @@ class SomaticMutationCaller:
                         continue
                     change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
                     alpha, beta = self.mut_probs[BQ][change_type][change_kmer]
-                    p_prior = alpha/(alpha+beta)
+                    p_prior = alpha / (alpha + beta)
                     new_p_prior = 0
                     for other_BQ in self.mut_probs:
                         other_alpha, other_beta = self.mut_probs[BQ][change_type][change_kmer]
-                        other_p_prior = other_alpha/(other_alpha, other_beta)
+                        other_p_prior = other_alpha / (other_alpha + other_beta)
                         if self.mean_type == "geometric":
                             new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
                         elif self.mean_type == "arithmetric":
@@ -559,13 +559,13 @@ class SomaticMutationCaller:
                     alpha1, beta1 = self.mut_probs[BQ1][change_type][change_kmer]
                     alpha2, beta2 = self.mut_probs[BQ2][change_type][change_kmer]
                 
-                    p_prior_1 = alpha1/(alpha1+beta1)
-                    p_prior_2 = alpha2/(alpha2+beta2)
+                    p_prior_1 = alpha1 / (alpha1 + beta1)
+                    p_prior_2 = alpha2 / (alpha2 + beta2)
 
                     if self.mean_type == "geometric":
-                        new_p_prior = math.sqrt(p_prior_1*p_prior_2)
+                        new_p_prior = math.sqrt(p_prior_1 * p_prior_2)
                     elif self.mean_type == "arithmetric":
-                        new_p_prior = ((p_prior_1+p_prior_2)/2)
+                        new_p_prior = ((p_prior_1 + p_prior_2)/2)
 
                     a = new_p_prior * self.prior_N
                     b = self.prior_N - a
