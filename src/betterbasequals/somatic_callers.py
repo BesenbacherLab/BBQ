@@ -590,7 +590,7 @@ class SomaticMutationCaller:
 
                 posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
                 if A==X:
-                    if type(read_BQ) == "tuple":
+                    if type(read_BQ) == tuple:
                         BQ1, BQ2 = read_BQ
                         read_BQ = max(BQ1,BQ2)
                     BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
