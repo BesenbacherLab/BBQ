@@ -1,6 +1,6 @@
 import py2bit
 from betterbasequals.utils import p2phred, eprint, reverse_complement, Read, zip_pileups_single_chrom, open_bam_w_index, read_variant_set
-from betterbasequals.pilup_handlers import get_pileup_count, get_alleles_w_quals, get_validation_probabities, get_alleles_w_probabities_update_ver2
+from betterbasequals.pilup_handlers import get_pileup_count, get_alleles_w_quals, get_validation_probabities
 
 from collections import Counter
 
