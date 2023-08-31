@@ -441,13 +441,13 @@ class ListMutationValidator:
         if not filter_alleles is None and ref not in filter_alleles:
             return 
 
-        
-        base_probs, n_mismatch, n_double, n_mismatch_BQ, n_double_BQ = get_alleles_w_probabities_update_ver2(pileupcolumn, ref, kmer, self.mut_probs, 100, True, 0.5)
-        for A in base_probs:
-            seen_validation = (chrom, ref_pos+1, A) in self.validation_set
-            N_A = sum(oldBQ > 30 for newBQ, MQ, oldBQ in base_probs[A])#sum(1 for x,y,_ in base_probs[A] if x<y)
-            for newBQ, MQ, oldBQ in base_probs[A]:            
-                print(oldBQ, int(newBQ), int(seen_validation), n_mismatch[A], n_double[A], n_mismatch_BQ[A][oldBQ], n_double_BQ[A][oldBQ], N_A, int(MQ))
+        ## FIXME: get_alleles_w_probabities_update_ver2 is outdated and should be updated before it is used:
+        #base_probs, n_mismatch, n_double, n_mismatch_BQ, n_double_BQ = get_alleles_w_probabities_update_ver2(pileupcolumn, ref, kmer, self.mut_probs, 100, True, 0.5)
+        #for A in base_probs:
+        #    seen_validation = (chrom, ref_pos+1, A) in self.validation_set
+        #    N_A = sum(oldBQ > 30 for newBQ, MQ, oldBQ in base_probs[A])#sum(1 for x,y,_ in base_probs[A] if x<y)
+        #    for newBQ, MQ, oldBQ in base_probs[A]:            
+        #        print(oldBQ, int(newBQ), int(seen_validation), n_mismatch[A], n_double[A], n_mismatch_BQ[A][oldBQ], n_double_BQ[A][oldBQ], N_A, int(MQ))
 
 
         # base_probs, seen_alts, n_mismatch, n_double, n_alt = get_validation_probabities(pileupcolumn, ref, kmer, self.mut_probs)    

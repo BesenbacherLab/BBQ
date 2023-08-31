@@ -3,7 +3,7 @@ import sys
 #from itertools import product, count
 #from operator import add
 #from functools import reduce, partial
-from collections import defaultdict
+from collections import defaultdict, Counter
 from math import log10
 import pysam
 import os
@@ -472,3 +472,13 @@ class VcfAfReader:
         else:
             return None
 
+
+def print_base_probs(base_probs):
+    for A in base_probs:
+        print(f"P_{A}->X", f"P_R->X", "count", sep='\t')
+        D = Counter()
+        for x in base_probs[A]:
+            D[x] += 1
+        for x in D:
+            p_A2X, p_R2X, MQ = x
+            print(phred2p(p_A2X),phred2p(p_R2X), D[x], sep = '\t')

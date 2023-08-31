@@ -360,15 +360,7 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
     return base_probs, posterior_base_probs, seen_alt, n_mismatch, n_double, n_alt
 
 
-# def update_BQ(BQ, N, n_mismatch, n_double):
-#     p = phred2p(BQ)
-#     a = p * N
-#     b = N - a
-#     new_p = (a + n_mismatch)/(a + b + n_double)
-#     new_BQ = p2phred(new_p)
-#     return new_BQ
-
-# def get_alleles_w_probabities(pileupcolumn, ref, ref_kmer, correction_factor, N, double_adjustment="max_plus3"):
+# def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5):
 #     """
 #     Returns a dictionary that maps from allele A to a list of tuples with probability of 
 #     observing Alt allele A given then read and probability of observing ref allele R given 
@@ -378,14 +370,14 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 #     """
 
 #     reads_mem = {}
-#     base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
 #     seen_alt = set()
 #     n_mismatch = Counter()
+#     n_mismatch_BQ = {'A':Counter(), 'C':Counter(), 'G':Counter(), 'T':Counter()}
 #     n_double = Counter()
+#     n_double_BQ = {'A':Counter(), 'C':Counter(), 'G':Counter(), 'T':Counter()}
 #     n_alt = Counter()
+#     events = {'A':[], 'C':[], 'G':[], 'T':[]}
 
-#     #tmp: counting ref... can be removed later
-#     n_ref = 0
 #     R = ref
 #     for pileup_read in pileupcolumn.pileups:
 #         # test for deletion at pileup
@@ -395,6 +387,9 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 
 #         # fetch read information
 #         read = Read(pileup_read)
+
+#         if not read.is_good():
+#             continue
 
 #         # test if read is okay
 #         if (
@@ -411,7 +406,7 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 #             # found partner process read pair
 #             mem_read = reads_mem.pop(read.query_name)
 
-#             # We do not trust mismathces in overlaps so we only handle matches
+#             # We do not trust mismathces in overlaps so we only add to events list in case of match
 #             if read.allel == mem_read.allel:
 #                 X = read.allel
             
@@ -422,36 +417,34 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 #                     seen_alt.add(X)
 
 #                 for A in alts:
+#                     #if not no_update:    
 #                     n_double[A] += 1
-                    
-#                     muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
- 
-#                     adjusted_base_qual_from_A1 = correction_factor[read.base_qual][muttype_from_A][kmer_from_A]
-#                     adjusted_base_qual_from_A2 = correction_factor[mem_read.base_qual][muttype_from_A][kmer_from_A]
-                    
-#                     if double_adjustment == "mult":
-#                         adjusted_base_qual_from_A = adjusted_base_qual_from_A1 + adjusted_base_qual_from_A2
-#                     elif double_adjustment == "max_plus3":
-#                         adjusted_base_qual_from_A = max(adjusted_base_qual_from_A1, adjusted_base_qual_from_A2) + 3
 
-#                     muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-#                     adjusted_base_qual_from_R1 = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
-#                     adjusted_base_qual_from_R2 = correction_factor[mem_read.base_qual][muttype_from_R][kmer_from_R]
-                    
-#                     if double_adjustment == "mult":
-#                         adjusted_base_qual_from_R = adjusted_base_qual_from_R1 + adjusted_base_qual_from_R2
-#                     elif double_adjustment == "max_plus3":
-#                         adjusted_base_qual_from_R = max(adjusted_base_qual_from_R1, adjusted_base_qual_from_R2) + 3
-                        
-#                     base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R))
+#                     read_MQ = (read.mapq + mem_read.mapq)/2
+#                     #if overlap_type == "double":
+#                     read_BQ = max(read.base_qual, mem_read.base_qual)
+#                     events[A].append(("double", X, read_BQ, read_MQ))
 
 #             else: # Mismatch
-#                 if read.allel != ref:
+#                 #if not no_update:
+#                 # TODO: Would it make sense to also count ref_mismatches so that we could
+#                 # do bayesian update of A->R error rates and not only R->A error rates?
+#                 if read.allel != ref and mem_read.allel == ref:
 #                     n_mismatch[read.allel] += 1
-#                     n_double[read.allel] += 1
-#                 if mem_read.allel != ref:
+#                     n_mismatch_BQ[read.allel][read.base_qual] += 1
+#                     for A in ['A','C','G','T']:
+#                         if A == ref:
+#                             continue
+#                         n_double[A] += 1
+#                         n_double_BQ[A][read.base_qual] += 1
+#                 if mem_read.allel != ref and read.allel == ref:
 #                     n_mismatch[mem_read.allel] += 1
-#                     n_double[mem_read.allel] += 1
+#                     n_mismatch_BQ[mem_read.allel][mem_read.base_qual] += 1
+#                     for A in ['A','C','G','T']:
+#                         if A == ref:
+#                             continue
+#                         n_double[A] += 1
+#                         n_double_BQ[A][mem_read.base_qual] += 1
 #         else:            
 #             reads_mem[read.query_name] = read
 
@@ -464,423 +457,91 @@ def get_alleles_w_probabities_seperate(pileupcolumn, ref, ref_kmer, correction_f
 #         else:
 #             alts = [X]
 #             seen_alt.add(X)
-#             if read.base_qual > 35:
-#                 n_alt[X] += 1
         
 #         for A in alts:
-#             muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
-#             adjusted_base_qual_from_A = correction_factor[read.base_qual][muttype_from_A][kmer_from_A]
-            
-#             muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-#             adjusted_base_qual_from_R = correction_factor[read.base_qual][muttype_from_R][kmer_from_R]
-            
-#             base_probs[A].append((adjusted_base_qual_from_A, adjusted_base_qual_from_R))
-    
-#     posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
-#     if N > 0:
-#         for A in base_probs:
-#             L = []
-#             for (from_A, from_R) in base_probs[A]:
-#                 L.append(update_BQ(from_A, N, n_mismatch[A], n_double[A]))
-
-#             if b_from_A is None:
-#                 posterior_from_A = a_from_A
-#             else:
-#                 posterior_from_A = (a_from_A + n_mismatch[A])/(a_from_A + b_from_A + n_double[A])
-
-#             if b_from_R is None:
-#                 posterior_from_R = a_from_R
-#             else:
-#                 posterior_from_R = (a_from_R + n_mismatch[A])/(a_from_R + b_from_R + n_double[A])
-
-#             posterior_base_probs[A].append((posterior_from_A, posterior_from_R))
-
-#     return base_probs, posterior_base_probs, seen_alt, n_mismatch, n_double, n_alt
-
-
-
-def get_alleles_w_probabities_update(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5, min_enddist=6, max_mismatch=2, filter_reads = True):
-    """
-    Returns a dictionary that maps from allele A to a list of tuples with probability of 
-    observing Alt allele A given then read and probability of observing ref allele R given 
-    the read. I.e.: base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
-    The probabilities are given on phred scale.
-    We only considder reads where X_read_i == A or X_read_i == R.
-    """
-
-    reads_mem = {}
-    seen_alt = set()
-    n_mismatch = Counter()
-    n_double = Counter()
-    n_pos = Counter()
-    n_neg = Counter()
-    events = {'A':[], 'C':[], 'G':[], 'T':[]}
-
-    R = ref
-    for pileup_read in pileupcolumn.pileups:
-        # test for deletion at pileup
-        if pileup_read.is_del or pileup_read.is_refskip:
-            continue
-        #TODO: should consider what the right solution is if there is deletion at overlap
-
-        # fetch read information
-        read = Read(pileup_read)
-
-        #if filter_reads and not read.is_good():
-        #    continue
-
-        # test if read is okay
-        if (
-            read.allel not in "ATGC"
-            or read.start is None
-            or read.end is None
-        ):
-            continue
-
-
-        # Look for read partner
-        if read.query_name in reads_mem:
-            # found partner process read pair
-            mem_read = reads_mem.pop(read.query_name)
-
-            # We do not trust mismathces in overlaps so we only add to events list in case of match
-            if read.allel == mem_read.allel:
-                X = read.allel
-
-                if filter_reads:
-                    if (not read.is_good(min_enddist, max_mismatch)) and mem_read.is_good(min_enddist, max_mismatch):
-                        #considder mem_read single read.
-                        reads_mem[read.query_name] = mem_read
-                        continue
-                    elif (not mem_read.is_good(min_enddist, max_mismatch)) and read.is_good(min_enddist, max_mismatch):
-                        #considder read single read.
-                        reads_mem[read.query_name] = read
-                        continue
-                    elif (not read.is_good(min_enddist, max_mismatch)) and (not mem_read.is_good(min_enddist, max_mismatch)):
-                        continue
-
-                if X == R:
-                    alts = [A for A in ['A','C','G','T'] if A!=R]
-                else:
-                    alts = [X]
-                    seen_alt.add(X)
-                    n_pos[X] += 1
-                    n_neg[X] += 1
-
-                for A in alts:
-                    #if not no_update:   
-                    n_double[A] += 1
-
-                    read_MQ = (read.mapq + mem_read.mapq)/2
-                    #if overlap_type == "double":
-                    read_BQ = max(read.base_qual, mem_read.base_qual)
-                    if read.base_qual > mem_read.base_qual:
-                        BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
-                    else:
-                        BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
-                    enddist = max(read.enddist, mem_read.enddist)
-                    has_indel = max(read.has_indel, mem_read.has_indel)
-                    has_clip = max(read.has_clip, mem_read.has_clip)
-                    NM = max(read.NM, mem_read.NM)
-                    #(read.base_qual, mem_read.base_qual)
-                    events[A].append(("double", X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair))
-
-            else: # Mismatch
-                #if not no_update:
-                # TODO: Would it make sense to also count ref_mismatches so that we could
-                # do bayesian update of A->R error rates and not only R->A error rates?
-                if read.allel != ref and mem_read.allel == ref:
-                    n_mismatch[read.allel] += 1
-                    for A in ['A','C','G','T']:
-                        if A == ref:
-                            continue
-                        n_double[A] += 1
-                if mem_read.allel != ref and read.allel == ref:
-                    n_mismatch[mem_read.allel] += 1
-                    for A in ['A','C','G','T']:
-                        if A == ref:
-                            continue
-                        n_double[A] += 1
-        else:            
-            reads_mem[read.query_name] = read
-
-    # Handle reads without partner (ie. no overlap)
-    for read in reads_mem.values():
-        X = read.allel
-        if filter_reads and not read.is_good(min_enddist, max_mismatch):
-            continue
-            
-        if X == R:
-            alts = [A for A in ['A','C','G','T'] if A!=R]
-        else:
-
-            alts = [X]
-            seen_alt.add(X)
-            if read.is_reverse:
-                n_neg[X] += 1
-            else:
-                n_pos[X] += 1
+#             events[A].append(("single", X, read.base_qual, read.mapq))
         
-        for A in alts:
-            events[A].append(("single", X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
-        
-    new_correction_factor = defaultdict(dict)
+#     new_correction_factor = defaultdict(dict)
 
-    #I only need to calculate probabilities of changing bases from one of the seen alleles.
-    # I have to considder change to all bases to calculate stay types (X->X) correctly.
-    relevant_bases = [ref] + list(seen_alt)
+#     #I only need to calculate probabilities of changing bases from one of the seen alleles.
+#     # I have to considder change to all bases to calculate stay types (X->X) correctly.
+#     relevant_bases = [ref] + list(seen_alt)
 
-    # calculate error probabilities for single reads:
-    for BQ in correction_factor:
-        new_correction_factor[BQ] = defaultdict(dict)
+#     for BQ in correction_factor:
+#         new_correction_factor[BQ] = defaultdict(dict)
 
-        for from_base in relevant_bases:
-            p_rest = 1.0
-            p_rest_double = 1.0
-            stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
-            for to_base in ['A', 'C', 'G', 'T']:
-                if to_base == from_base:
-                    continue
-                change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                alpha, beta = correction_factor[BQ][change_type][change_kmer]
-                p_prior = alpha/(alpha+beta)
-                new_p_prior = 0
-                for other_BQ in correction_factor:
-                    other_alpha, other_beta = correction_factor[BQ][change_type][change_kmer]
-                    other_p_prior = other_alpha/(other_alpha, other_beta)
-                    new_p_prior += BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
-                a = p_prior * prior_N
-                b = prior_N - a
-                if no_update or from_base != ref:
-                    p_posterior = a/(a + b)
-                else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                p_rest -= p_posterior
-                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                new_correction_factor[BQ]["single"][change_type][change_kmer] = p2phred(p_posterior)
-
-                p_prior_double = p_prior * double_adjustment
-                a = p_prior_double * prior_N
-                b = prior_N - a
-                if no_update or from_base != ref:
-                    p_posterior = a/(a + b)
-                else:
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                p_rest_double -= p_posterior
-                new_correction_factor[BQ]["double"][change_type][change_kmer] = p2phred(p_posterior)
-            
-            new_correction_factor[BQ]["single"][stay_type][stay_kmer] = p2phred(p_rest)
-            new_correction_factor[BQ]["double"][stay_type][stay_kmer] = p2phred(p_rest_double)
-
-    posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
-    BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
-    for A in seen_alt:
-        for overlap_type, X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair in events[A]:
-            muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
-            muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-            posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
-            posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
-
-            # if overlap_type == "single":
-            #     posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
-            #     posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
-            # elif overlap_type == "double":
-            #     BQ1, BQ2 = read_BQ
-            #     posterior_from_A = new_correction_factor[BQ1]["single"][muttype_from_A][kmer_from_A] + new_correction_factor[BQ2]["single"][muttype_from_A][kmer_from_A]
-            #     posterior_from_R = new_correction_factor[BQ1]["single"][muttype_from_R][kmer_from_R] + new_correction_factor[BQ2]["single"][muttype_from_R][kmer_from_R]
-            #     read_BQ = max(BQ1,BQ2)
-
-            posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
-            if A==X:
-                BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
-                    
-    return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
-
-
-
-def get_alleles_w_probabities_update_ver2(pileupcolumn, ref, ref_kmer, correction_factor, prior_N, no_update, double_adjustment=0.5):
-    """
-    Returns a dictionary that maps from allele A to a list of tuples with probability of 
-    observing Alt allele A given then read and probability of observing ref allele R given 
-    the read. I.e.: base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
-    The probabilities are given on phred scale.
-    We only considder reads where X_read_i == A or X_read_i == R.
-    """
-
-    reads_mem = {}
-    seen_alt = set()
-    n_mismatch = Counter()
-    n_mismatch_BQ = {'A':Counter(), 'C':Counter(), 'G':Counter(), 'T':Counter()}
-    n_double = Counter()
-    n_double_BQ = {'A':Counter(), 'C':Counter(), 'G':Counter(), 'T':Counter()}
-    n_alt = Counter()
-    events = {'A':[], 'C':[], 'G':[], 'T':[]}
-
-    R = ref
-    for pileup_read in pileupcolumn.pileups:
-        # test for deletion at pileup
-        if pileup_read.is_del or pileup_read.is_refskip:
-            continue
-        #TODO: should consider what the right solution is if there is deletion at overlap
-
-        # fetch read information
-        read = Read(pileup_read)
-
-        if not read.is_good():
-            continue
-
-        # test if read is okay
-        if (
-            read.allel not in "ATGC"
-            or read.start is None
-            or read.end is None
-            #or read.NH != 1
-        ):
-            continue
-
-
-        # Look for read partner
-        if read.query_name in reads_mem:
-            # found partner process read pair
-            mem_read = reads_mem.pop(read.query_name)
-
-            # We do not trust mismathces in overlaps so we only add to events list in case of match
-            if read.allel == mem_read.allel:
-                X = read.allel
-            
-                if X == R:
-                    alts = [A for A in ['A','C','G','T'] if A!=R]
-                else:
-                    alts = [X]
-                    seen_alt.add(X)
-
-                for A in alts:
-                    #if not no_update:    
-                    n_double[A] += 1
-
-                    read_MQ = (read.mapq + mem_read.mapq)/2
-                    #if overlap_type == "double":
-                    read_BQ = max(read.base_qual, mem_read.base_qual)
-                    events[A].append(("double", X, read_BQ, read_MQ))
-
-            else: # Mismatch
-                #if not no_update:
-                # TODO: Would it make sense to also count ref_mismatches so that we could
-                # do bayesian update of A->R error rates and not only R->A error rates?
-                if read.allel != ref and mem_read.allel == ref:
-                    n_mismatch[read.allel] += 1
-                    n_mismatch_BQ[read.allel][read.base_qual] += 1
-                    for A in ['A','C','G','T']:
-                        if A == ref:
-                            continue
-                        n_double[A] += 1
-                        n_double_BQ[A][read.base_qual] += 1
-                if mem_read.allel != ref and read.allel == ref:
-                    n_mismatch[mem_read.allel] += 1
-                    n_mismatch_BQ[mem_read.allel][mem_read.base_qual] += 1
-                    for A in ['A','C','G','T']:
-                        if A == ref:
-                            continue
-                        n_double[A] += 1
-                        n_double_BQ[A][mem_read.base_qual] += 1
-        else:            
-            reads_mem[read.query_name] = read
-
-    # Handle reads without partner (ie. no overlap)
-    for read in reads_mem.values():
-        X = read.allel
-            
-        if X == R:
-            alts = [A for A in ['A','C','G','T'] if A!=R]
-        else:
-            alts = [X]
-            seen_alt.add(X)
-        
-        for A in alts:
-            events[A].append(("single", X, read.base_qual, read.mapq))
-        
-    new_correction_factor = defaultdict(dict)
-
-    #I only need to calculate probabilities of changing bases from one of the seen alleles.
-    # I have to considder change to all bases to calculate stay types (X->X) correctly.
-    relevant_bases = [ref] + list(seen_alt)
-
-    for BQ in correction_factor:
-        new_correction_factor[BQ] = defaultdict(dict)
-
-        for from_base in relevant_bases:
-            p_rest = 1.0
-            stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
-            for to_base in ['A', 'C', 'G', 'T']:
-                if to_base == from_base:
-                    continue
-                change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                alpha, beta = correction_factor[BQ][change_type][change_kmer]
-                p_prior = alpha/(alpha+beta)
-                new_p_prior = 0
-                for other_BQ in correction_factor:
-                    other_alpha, other_beta = correction_factor[BQ][change_type][change_kmer]
-                    other_p_prior = other_alpha/(other_alpha, other_beta)
-                    new_p_prior += BQ_freq[BQ] * 
-                a = p_prior * prior_N
-                b = prior_N - a
-                if no_update:
-                    p_posterior = a/(a + b)
-                else: 
-                    p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                p_rest -= p_posterior
+#         for from_base in relevant_bases:
+#             p_rest = 1.0
+#             stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
+#             for to_base in ['A', 'C', 'G', 'T']:
+#                 if to_base == from_base:
+#                     continue
+#                 change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
+#                 alpha, beta = correction_factor[BQ][change_type][change_kmer]
+#                 p_prior = alpha/(alpha+beta)
+#                 new_p_prior = 0
+#                 for other_BQ in correction_factor:
+#                     other_alpha, other_beta = correction_factor[BQ][change_type][change_kmer]
+#                     other_p_prior = other_alpha/(other_alpha, other_beta)
+#                     new_p_prior += BQ_freq[BQ] * 
+#                 a = p_prior * prior_N
+#                 b = prior_N - a
+#                 if no_update:
+#                     p_posterior = a/(a + b)
+#                 else: 
+#                     p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+#                 p_rest -= p_posterior
                 
-                new_correction_factor[BQ][change_type][change_kmer] = p2phred(p_posterior)
+#                 new_correction_factor[BQ][change_type][change_kmer] = p2phred(p_posterior)
            
-            new_correction_factor[BQ][stay_type][stay_kmer] = p2phred(p_rest)
+#             new_correction_factor[BQ][stay_type][stay_kmer] = p2phred(p_rest)
  
-    # calculate error rates for double reads:
-    for BQ1, BQ2 in double_combinations:
-        new_correction_factor[(BQ1,BQ2)] = defaultdict(dict)
-        for from_base in relevant_bases:
-            p_rest = 1.0
-            stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
-            for to_base in ['A', 'C', 'G', 'T']:
-                if to_base == from_base:
-                    continue
-                change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                alpha1, beta1 = correction_factor[BQ1][change_type][change_kmer]
-                alpha2, beta2 = correction_factor[BQ2][change_type][change_kmer]
+#     # calculate error rates for double reads:
+#     for BQ1, BQ2 in double_combinations:
+#         new_correction_factor[(BQ1,BQ2)] = defaultdict(dict)
+#         for from_base in relevant_bases:
+#             p_rest = 1.0
+#             stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
+#             for to_base in ['A', 'C', 'G', 'T']:
+#                 if to_base == from_base:
+#                     continue
+#                 change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
+#                 alpha1, beta1 = correction_factor[BQ1][change_type][change_kmer]
+#                 alpha2, beta2 = correction_factor[BQ2][change_type][change_kmer]
                 
-                p_prior_1 = alpha1/(alpha1+beta1)
-                p_prior_2 = alpha2/(alpha2+beta2)
+#                 p_prior_1 = alpha1/(alpha1+beta1)
+#                 p_prior_2 = alpha2/(alpha2+beta2)
 
-                p_prior_double = math.exp(math.log(p_prior_1)/double_adjustment) * p_prior_2
-                a = p_prior_double * prior_N
-                b = prior_N - a
-                if no_update or from_base != ref:
-                    p_posterior = a/(a + b)
-                else:
-                    p_posterior = (a + n_mismatch)/(a + b + n_double)
-                    #p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                p_rest -= p_posterior
-                new_correction_factor[(BQ1, BQ2)][change_type][change_kmer] = p2phred(p_posterior)
-            new_correction_factor[(BQ1, BQ2)][stay_type][change_kmer] = p2phred(p_rest)
+#                 p_prior_double = math.exp(math.log(p_prior_1)/double_adjustment) * p_prior_2
+#                 a = p_prior_double * prior_N
+#                 b = prior_N - a
+#                 if no_update or from_base != ref:
+#                     p_posterior = a/(a + b)
+#                 else:
+#                     p_posterior = (a + n_mismatch)/(a + b + n_double)
+#                     #p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+#                 #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
+#                 p_rest -= p_posterior
+#                 new_correction_factor[(BQ1, BQ2)][change_type][change_kmer] = p2phred(p_posterior)
+#             new_correction_factor[(BQ1, BQ2)][stay_type][change_kmer] = p2phred(p_rest)
 
 
 
-    posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
-    BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
-    for A in seen_alt:
-        for overlap_type, X, read_BQ, read_MQ in events[A]:
-            #muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
-            muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
+#     posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
+#     BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
+#     for A in seen_alt:
+#         for overlap_type, X, read_BQ, read_MQ in events[A]:
+#             #muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
+#             muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
             
-            #posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
-            posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
-            if A==X:
-                posterior_base_probs[A].append((posterior_from_R, read_MQ, read_BQ))
-            #if A==X:
-            #    BQs[A].append((read_BQ, posterior_from_R))
+#             #posterior_from_A = new_correction_factor[read_BQ][overlap_type][muttype_from_A][kmer_from_A]
+#             posterior_from_R = new_correction_factor[read_BQ][overlap_type][muttype_from_R][kmer_from_R]
+#             if A==X:
+#                 posterior_base_probs[A].append((posterior_from_R, read_MQ, read_BQ))
+#             #if A==X:
+#             #    BQs[A].append((read_BQ, posterior_from_R))
                     
-    return posterior_base_probs, n_mismatch, n_double, n_mismatch_BQ, n_double_BQ
+#     return posterior_base_probs, n_mismatch, n_double, n_mismatch_BQ, n_double_BQ
 
 
 
