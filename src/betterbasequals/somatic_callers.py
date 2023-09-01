@@ -525,12 +525,16 @@ class SomaticMutationCaller:
                     p_prior = alpha / (alpha + beta)
                     new_p_prior = 0
                     for other_BQ in self.mut_probs:
-                        other_alpha, other_beta = self.mut_probs[BQ][change_type][change_kmer]
+                        other_alpha, other_beta = self.mut_probs[other_BQ][change_type][change_kmer]
                         other_p_prior = other_alpha / (other_alpha + other_beta)
+
                         if self.mean_type == "geometric":
                             new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
                         elif self.mean_type == "arithmetric":
                             new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
+                        else:
+                            assert False, f'unknown mean_type parameter: {self.mean_type}'
+
 
                     a = new_p_prior * self.prior_N
                     b = self.prior_N - a
@@ -566,6 +570,8 @@ class SomaticMutationCaller:
                         new_p_prior = math.sqrt(p_prior_1 * p_prior_2)
                     elif self.mean_type == "arithmetric":
                         new_p_prior = ((p_prior_1 + p_prior_2)/2)
+                    else:
+                        assert False, f'unknown mean_type parameter: {self.mean_type}'
 
                     a = new_p_prior * self.prior_N
                     b = self.prior_N - a
