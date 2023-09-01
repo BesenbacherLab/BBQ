@@ -135,14 +135,17 @@ class SomaticMutationCaller:
 
         self.BQ_freq = {}
         for BQ in kmer_papa:
-            self.BQ_freq[BQ] = 0
+            self.BQ_freq[BQ] = {}
             for muttype in kmer_papa[BQ]:
+                self.BQ_freq[BQ][muttype] = 0
                 for kmer in kmer_papa[BQ][muttype]:
                     a,b  = kmer_papa[BQ][muttype][kmer]
-                    self.BQ_freq[BQ] += a + b
-        total_sum = sum(self.BQ_freq.values())
-        for BQ in kmer_papa:
-            self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
+                    self.BQ_freq[BQ][muttype] += a + b
+        
+        for BQ in self.BQ_freq:
+            total_sum = sum(self.BQ_freq[BQ].values())
+            for muttype in self.BQ_freq[BQ]:
+                self.BQ_freq[BQ][muttype] = self.BQ_freq[BQ][muttype]/total_sum
 
         #This should be handled in pileup code now.
         #if self.method == 'LR':
@@ -529,12 +532,12 @@ class SomaticMutationCaller:
                         other_p_prior = other_alpha / (other_alpha + other_beta)
 
                         if self.mean_type == "geometric":
-                            new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
+                            new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
                         elif self.mean_type == "arithmetric":
-                            new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
+                            new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
                         else:
                             assert False, f'unknown mean_type parameter: {self.mean_type}'
-
+                    assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
 
                     a = new_p_prior * self.prior_N
                     b = self.prior_N - a
@@ -543,8 +546,12 @@ class SomaticMutationCaller:
                     else:
                         p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                     p_rest -= p_posterior
+
+                    assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
                     #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                     new_mut_probs[BQ][change_type][change_kmer] = p2phred(p_posterior)
+
+                assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
                 new_mut_probs[BQ][stay_type][stay_kmer] = p2phred(p_rest)
     
 
@@ -573,6 +580,8 @@ class SomaticMutationCaller:
                     else:
                         assert False, f'unknown mean_type parameter: {self.mean_type}'
 
+                    assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
+
                     a = new_p_prior * self.prior_N
                     b = self.prior_N - a
                     if self.no_update or from_base != ref:
@@ -580,8 +589,12 @@ class SomaticMutationCaller:
                     else:
                         p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                     p_rest -= p_posterior
+
+                    assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
                     #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                     new_mut_probs[(BQ1,BQ2)][change_type][change_kmer] = p2phred(p_posterior)
+
+                assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
                 new_mut_probs[(BQ1,BQ2)][stay_type][stay_kmer] = p2phred(p_rest)    
 
 
