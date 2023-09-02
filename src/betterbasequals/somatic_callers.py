@@ -110,6 +110,7 @@ class SomaticMutationCaller:
         min_enddist = 6,
         max_mismatch = 2,
         mean_type = "arithmetric",
+        BQ_freq_method = 'global',
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
@@ -132,34 +133,39 @@ class SomaticMutationCaller:
 
         self.outfile = outfile
         self.method = method
+        self.BQ_freq_method = BQ_freq_method
 
-        # self.BQ_freq = {}
-        # for BQ in kmer_papa:
-        #     self.BQ_freq[BQ] = 0
-        #     for muttype in kmer_papa[BQ]:                
-        #         for kmer in kmer_papa[BQ][muttype]:
-        #             a,b  = kmer_papa[BQ][muttype][kmer]
-        #             self.BQ_freq[BQ] += a + b
-        
-        # total_sum = sum(self.BQ_freq[BQ].values())
-        # for BQ in self.BQ_freq:
-        #     self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
+        if BQ_freq_method == 'global_by_type':
+            self.BQ_freq = {}
+            for BQ in kmer_papa:
+                self.BQ_freq[BQ] = {}
+                for muttype in kmer_papa[BQ]:
+                    self.BQ_freq[BQ][muttype] = 0
+                    for kmer in kmer_papa[BQ][muttype]:
+                        a,b  = kmer_papa[BQ][muttype][kmer]
+                        self.BQ_freq[BQ][muttype] += a + b
+            
+            for muttype in change_mtypes:
+                total_sum = sum(self.BQ_freq[BQ][muttype] for BQ in self.BQ_freq)
+                for BQ in self.BQ_freq:
+                    self.BQ_freq[BQ][muttype] = self.BQ_freq[BQ][muttype]/total_sum
 
-        self.BQ_freq = {}
-        for BQ in kmer_papa:
-            self.BQ_freq[BQ] = {}
-            for muttype in kmer_papa[BQ]:
-                self.BQ_freq[BQ][muttype] = 0
-                for kmer in kmer_papa[BQ][muttype]:
-                    a,b  = kmer_papa[BQ][muttype][kmer]
-                    self.BQ_freq[BQ][muttype] += a + b
+            assert (self.BQ_freq[11]['A->C'] + self.BQ_freq[25]['A->C'] + self.BQ_freq[37]['A->C']) -1.0 < 1e-7
+        elif BQ_freq_method == 'global':
+            self.BQ_freq = {}
+            for BQ in kmer_papa:
+                self.BQ_freq[BQ] = 0
+                for muttype in kmer_papa[BQ]:                
+                    for kmer in kmer_papa[BQ][muttype]:
+                        a,b  = kmer_papa[BQ][muttype][kmer]
+                        self.BQ_freq[BQ] += a + b
         
-        for muttype in change_mtypes:
-            total_sum = sum(self.BQ_freq[BQ][muttype] for BQ in self.BQ_freq)
+            total_sum = sum(self.BQ_freq[BQ].values())
             for BQ in self.BQ_freq:
-                self.BQ_freq[BQ][muttype] = self.BQ_freq[BQ][muttype]/total_sum
+                self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
+        else:
+            assert False, f'Unknown BQ_freq_method : {BQ_freq_method}'
 
-        assert (self.BQ_freq[11]['A->C'] + self.BQ_freq[25]['A->C'] + self.BQ_freq[37]['A->C']) -1.0 < 1e-7
         #This should be handled in pileup code now.
         #if self.method == 'LR':
             # make sure that all X->X are also in kmerpapa
@@ -545,11 +551,15 @@ class SomaticMutationCaller:
                         other_p_prior = other_alpha / (other_alpha + other_beta)
 
                         if self.mean_type == "geometric":
-                            #new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
-                            new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
+                            if self.BQ_freq_method == 'global':
+                                new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
+                            elif self.BQ_freq_method == 'global_by_type':
+                                new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
                         elif self.mean_type == "arithmetric":
-                            #new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
-                            new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
+                            if self.BQ_freq_method == 'global':
+                                new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
+                            elif self.BQ_freq_method == 'global_by_type':
+                                new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
                         else:
                             assert False, f'unknown mean_type parameter: {self.mean_type}'
                     assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"

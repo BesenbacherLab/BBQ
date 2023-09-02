@@ -132,7 +132,9 @@ def get_parser():
     call_parent.add_argument('--mean_type', type=str,
         choices=['arithmetric', 'geometric'], default="arithmetric",
         help="How to calculate the mean error probabilty of two matching overlapping alleles")
-    
+    call_parent.add_argument('--BQ_freq_method', type=str,
+        choices=['global', 'global_by_type'], default="global",
+        help="How to calculate the probability of seeing a specific BQ")
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -378,7 +380,8 @@ def run_call(opts, kmer_papas):
             opts.pop_vcf,
             opts.min_enddist,
             opts.max_mismatch,
-            opts.mean_type
+            opts.mean_type,
+            opts.BQ_freq_method,
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()
