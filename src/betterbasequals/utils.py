@@ -9,7 +9,7 @@ import pysam
 import os
 import gzip
 
-#mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T')
+change_mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T')
 mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'A->A', 'C->C')
 
 

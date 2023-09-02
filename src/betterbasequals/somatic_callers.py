@@ -1,6 +1,6 @@
 import py2bit
 from scipy.optimize import minimize_scalar
-from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read
+from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read, change_mtypes
 from collections import Counter, defaultdict
 import scipy.stats
 import math
@@ -133,6 +133,18 @@ class SomaticMutationCaller:
         self.outfile = outfile
         self.method = method
 
+        # self.BQ_freq = {}
+        # for BQ in kmer_papa:
+        #     self.BQ_freq[BQ] = 0
+        #     for muttype in kmer_papa[BQ]:                
+        #         for kmer in kmer_papa[BQ][muttype]:
+        #             a,b  = kmer_papa[BQ][muttype][kmer]
+        #             self.BQ_freq[BQ] += a + b
+        
+        # total_sum = sum(self.BQ_freq[BQ].values())
+        # for BQ in self.BQ_freq:
+        #     self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
+
         self.BQ_freq = {}
         for BQ in kmer_papa:
             self.BQ_freq[BQ] = {}
@@ -142,11 +154,12 @@ class SomaticMutationCaller:
                     a,b  = kmer_papa[BQ][muttype][kmer]
                     self.BQ_freq[BQ][muttype] += a + b
         
-        for BQ in self.BQ_freq:
-            total_sum = sum(self.BQ_freq[BQ].values())
-            for muttype in self.BQ_freq[BQ]:
+        for muttype in change_mtypes:
+            total_sum = sum(self.BQ_freq[BQ][muttype] for BQ in self.BQ_freq)
+            for BQ in self.BQ_freq:
                 self.BQ_freq[BQ][muttype] = self.BQ_freq[BQ][muttype]/total_sum
 
+        assert (self.BQ_freq[11]['A->C'] + self.BQ_freq[25]['A->C'] + self.BQ_freq[37]['A->C']) -1.0 < 1e-7
         #This should be handled in pileup code now.
         #if self.method == 'LR':
             # make sure that all X->X are also in kmerpapa
@@ -532,8 +545,10 @@ class SomaticMutationCaller:
                         other_p_prior = other_alpha / (other_alpha + other_beta)
 
                         if self.mean_type == "geometric":
+                            #new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
                             new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
                         elif self.mean_type == "arithmetric":
+                            #new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
                             new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
                         else:
                             assert False, f'unknown mean_type parameter: {self.mean_type}'
