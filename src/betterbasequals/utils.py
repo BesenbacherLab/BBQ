@@ -37,6 +37,12 @@ def mut_type(from_base, to_base, kmer):
     else:
         return f'{from_base}->{to_base}', new_kmer
 
+def SW_type(base):
+    if base in ['G','T']:
+        return ostrand(base)
+    else:
+        return base
+
 
 def get_average_coverage(bamfile):
     """Quickly calculates the average coverage of a WGS bamfile using the bam index.

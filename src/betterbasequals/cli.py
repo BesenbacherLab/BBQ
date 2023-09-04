@@ -133,7 +133,7 @@ def get_parser():
         choices=['arithmetric', 'geometric'], default="arithmetric",
         help="How to calculate the mean error probabilty of two matching overlapping alleles")
     call_parent.add_argument('--BQ_freq_method', type=str,
-        choices=['global', 'global_by_type'], default="global",
+        choices=['global', 'global_by_type', 'global_by_base'], default="global",
         help="How to calculate the probability of seeing a specific BQ")
 
     count_parser = subparsers.add_parser('count', 
