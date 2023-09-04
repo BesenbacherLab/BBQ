@@ -39,7 +39,7 @@ def mut_type(from_base, to_base, kmer):
 
 def SW_type(base):
     if base in ['G','T']:
-        return ostrand(base)
+        return ostrand[base]
     else:
         return base
 
