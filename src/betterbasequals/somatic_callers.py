@@ -160,9 +160,11 @@ class SomaticMutationCaller:
                         a,b  = kmer_papa[BQ][muttype][kmer]
                         self.BQ_freq[BQ] += a + b
         
-            total_sum = sum(self.BQ_freq[BQ])
+            total_sum = sum(self.BQ_freq.values())
             for BQ in self.BQ_freq:
                 self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
+            
+            assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37]) -1.0 < 1e-7
         else:
             assert False, f'Unknown BQ_freq_method : {BQ_freq_method}'
 
