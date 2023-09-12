@@ -281,7 +281,7 @@ class SomaticMutationCaller:
                     pos = pread.query_position
                     if not pos is None:
                         n_alleles[pread.alignment.query_sequence[pos]] += 1
-                    N_filter = sum(n_alleles.values())
+                N_filter = sum(n_alleles.values())
                 if N_filter < self.min_filter_depth or N_filter > self.max_filter_depth:
                     continue
                 #filter_alleles = [x for x,y in n_alleles.items() if y >= self.min_filter_count]
