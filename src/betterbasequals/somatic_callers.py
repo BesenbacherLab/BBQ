@@ -175,10 +175,11 @@ class SomaticMutationCaller:
                         self.BQ_freq[BQ] += a + b
         
             total_sum = sum(self.BQ_freq.values())
+            total_sum += (double_adjustment*total_sum)/(1-double_adjustment)
             for BQ in self.BQ_freq:
                 self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
             
-            assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37]) -1.0 < 1e-7
+            assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37] + double_adjustment) -1.0 < 1e-7
         else:
             assert False, f'Unknown BQ_freq_method : {BQ_freq_method}'
 
