@@ -202,7 +202,7 @@ class SomaticMutationCaller:
         self.cutoff = cutoff
         self.prior_N = prior_N
         self.no_update = no_update
-        
+        self.N_rate = N_rate
 
         if not pop_vcf is None:
             self.pop_vcf = VcfAfReader(pop_vcf)
@@ -583,6 +583,9 @@ class SomaticMutationCaller:
                                 new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * ((other_p_prior+p_prior)/2)
                         else:
                             assert False, f'unknown mean_type parameter: {self.mean_type}'
+                    if self.mean_type == "geometric" and self.BQ_freq_method == 'global':
+                        new_p_prior += self.N_rate * math.sqrt(p_prior)
+
                     assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
 
                     a = new_p_prior * self.prior_N
