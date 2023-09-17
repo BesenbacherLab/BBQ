@@ -102,7 +102,7 @@ class SomaticMutationCaller:
         cutoff,
         prior_N,
         no_update,
-        double_adjustment,
+        N_rate,
         mapq = 50,
         min_base_qual = 1,
         min_filter_count = 2,
@@ -175,11 +175,11 @@ class SomaticMutationCaller:
                         self.BQ_freq[BQ] += a + b
         
             total_sum = sum(self.BQ_freq.values())
-            total_sum += (double_adjustment*total_sum)/(1-double_adjustment)
+            total_sum += (N_ratet*total_sum)/(1-N_rate)
             for BQ in self.BQ_freq:
                 self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
             
-            assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37] + double_adjustment) -1.0 < 1e-7
+            assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37] + N_rate) -1.0 < 1e-7
         else:
             assert False, f'Unknown BQ_freq_method : {BQ_freq_method}'
 
@@ -202,7 +202,7 @@ class SomaticMutationCaller:
         self.cutoff = cutoff
         self.prior_N = prior_N
         self.no_update = no_update
-        self.double_adjustment = double_adjustment
+        
 
         if not pop_vcf is None:
             self.pop_vcf = VcfAfReader(pop_vcf)

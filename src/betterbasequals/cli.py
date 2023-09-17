@@ -119,8 +119,8 @@ def get_parser():
         help="Weight (as sample size) of the kmer based prior on error rate.")
     call_parent.add_argument('--no_update',  action='store_true',
         help="Do not make bayesian update of error rate but use rate only estimated from kmers")
-    call_parent.add_argument('--double_adjustment', type=float, default=0.5,
-        help="How much lower should the error rate be if we see a matching overlap.")
+    call_parent.add_argument('--N_rate', type=float, default=0.0,
+        help="Rate of N (non-call) bases")
     call_parent.add_argument('--min_BQ', type=int, default=1,
         help="Minimum base quality to considder")
     call_parent.add_argument('--min_MQ', type=int, default=50,
@@ -373,7 +373,7 @@ def run_call(opts, kmer_papas):
             opts.cutoff,
             opts.prior_N,
             opts.no_update,
-            opts.double_adjustment,
+            opts.N_rate,
             opts.min_MQ,
             opts.min_BQ,
             opts.filter_max_count,
