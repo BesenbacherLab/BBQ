@@ -175,7 +175,7 @@ class SomaticMutationCaller:
                         self.BQ_freq[BQ] += a + b
         
             total_sum = sum(self.BQ_freq.values())
-            total_sum += (N_ratet*total_sum)/(1-N_rate)
+            total_sum += (N_rate*total_sum)/(1-N_rate)
             for BQ in self.BQ_freq:
                 self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
             
