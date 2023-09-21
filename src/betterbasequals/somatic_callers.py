@@ -360,8 +360,9 @@ class SomaticMutationCaller:
 
                 QUAL = -LR
                 if self.cutoff is None or QUAL >= self.cutoff:
-                    oldBQ_str = '[' + ','.join(x[-1] for x in BQs[A]) + ']'
+                    oldBQ_str = '[' + ','.join(x[6] for x in BQs[A]) + ']'
                     newBQ = '[' +','.join(f'{x[1]:.1f}' for x in BQs[A]) + ']'
+                    BQsum = '[' +','.join(f'{x[7]:.1f}' for x in BQs[A]) + ']'
                     
                     oldBQ = [x[0] for x in BQs[A]]
                     oldBQ.sort()
@@ -395,7 +396,7 @@ class SomaticMutationCaller:
                     median_NM = NM[len(NM)//2]
                     frac_indel = sum(has_indel)/len(has_indel)
                     frac_clip = sum(has_clip)/len(has_clip)
-
+                    sumBQs = [x[7] for x in BQs[A]]
                     n37_other = sum(x[0]==37 for alt in 'ACGT' for x in BQs[alt] if alt not in [ref,A])
                     #n37_other_nf = sum(x[0]==37 for alt in 'ACGT' for x in no_filter_BQs[alt] if alt not in [ref,A])
 
@@ -413,7 +414,7 @@ class SomaticMutationCaller:
 
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={no_filter_n_mismatch[A]};n_overlap={no_filter_n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};no_filter_n_other={n37_other_nf}{optional_info}', file=self.outfile)
-                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other}{optional_info}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};BQsum={BQsum}{optional_info}', file=self.outfile)
 
         return n_calls
     
@@ -512,8 +513,9 @@ class SomaticMutationCaller:
                         has_indel = max(read.has_indel, mem_read.has_indel)
                         has_clip = max(read.has_clip, mem_read.has_clip)
                         NM = max(read.NM, mem_read.NM)
+                        BQsum = (read.BQsum + mem_read.BQsum)/2
                         #(read.base_qual, mem_read.base_qual)
-                        events[A].append((X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair))
+                        events[A].append((X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, BQsum))
 
                 else: # Mismatch
                     #if not no_update:
@@ -552,7 +554,7 @@ class SomaticMutationCaller:
                     n_pos[X] += 1
             
             for A in alts:
-                events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
+                events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual), read.BQsum))
             
         new_mut_probs = defaultdict(dict)
 
@@ -671,7 +673,7 @@ class SomaticMutationCaller:
         BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
         for A in seen_alt:
             posterior_base_probs[A] = []
-            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair in events[A]:
+            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, BQsum in events[A]:
                 muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
                 muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
                 posterior_from_A = new_mut_probs[read_BQ][muttype_from_A][kmer_from_A]
@@ -682,7 +684,7 @@ class SomaticMutationCaller:
                     if type(read_BQ) == tuple:
                         BQ1, BQ2 = read_BQ
                         read_BQ = max(BQ1,BQ2)
-                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
+                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair, BQsum))
                 
         return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
 

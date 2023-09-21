@@ -155,6 +155,7 @@ class Read:
         self.has_clip = sum(cigar_stats[4:6]) != 0
         #self.NM = cigar_stats[8]
         self.NM = cigar_stats[10]
+        self.BQsum = sum(self.pileup_read.alignment.query_qualities)
         #print(pileup_read.alignment.get_cigar_stats())
     
     def is_good(self, min_enddist=6, max_mismatch = 2):
