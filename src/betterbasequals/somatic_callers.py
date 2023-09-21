@@ -180,6 +180,8 @@ class SomaticMutationCaller:
                 self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
             
             assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37] + N_rate) -1.0 < 1e-7
+        elif BQ_freq_method == 'local':
+            pass
         else:
             assert False, f'Unknown BQ_freq_method : {BQ_freq_method}'
 
@@ -433,6 +435,10 @@ class SomaticMutationCaller:
         events = {'A':[], 'C':[], 'G':[], 'T':[]}
         double_combinations = set()
         R = ref
+        if self.BQ_freq_method == 'local':
+            self.BQ_freq = Counter()
+            self.N_rate = 0
+
         for pileup_read in pileupcolumn.pileups:
             # test for deletion at pileup
             if pileup_read.is_del or pileup_read.is_refskip:
@@ -441,6 +447,9 @@ class SomaticMutationCaller:
 
             # fetch read information
             read = Read(pileup_read)
+
+            if self.BQ_freq_method == 'local' and read.allel == 'N':
+                self.N_rate += 1
 
             #if filter_reads and not read.is_good():
             #    continue
@@ -453,6 +462,8 @@ class SomaticMutationCaller:
             ):
                 continue
 
+            if self.BQ_freq_method == 'local':
+                self.BQ_freq[read.base_qual] += 1
 
             # Look for read partner
             if read.query_name in reads_mem:
@@ -549,6 +560,12 @@ class SomaticMutationCaller:
         # I have to considder change to all bases to calculate stay types (X->X) correctly.
         relevant_bases = [ref] + list(seen_alt)
 
+        if self.BQ_freq_method == 'local':
+            total_sum = sum(self.BQ_freq.values()) + self.N_rate
+            self.N_rate = self.N_rate / total_sum
+            for BQ in self.BQ_freq:
+                self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
+
         # calculate error probabilities for single reads:
         for BQ in self.mut_probs:
             new_mut_probs[BQ] = defaultdict(dict)
@@ -568,14 +585,14 @@ class SomaticMutationCaller:
                         other_p_prior = other_alpha / (other_alpha + other_beta)
 
                         if self.mean_type == "geometric":
-                            if self.BQ_freq_method == 'global':
+                            if self.BQ_freq_method in ['global', 'local']:
                                 new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
                             elif self.BQ_freq_method == 'global_by_type':
                                 new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
                             elif self.BQ_freq_method == 'global_by_base':
                                 new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * math.sqrt(other_p_prior*p_prior)
                         elif self.mean_type == "arithmetric":
-                            if self.BQ_freq_method == 'global':
+                            if self.BQ_freq_method in ['global', 'local']:
                                 new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
                             elif self.BQ_freq_method == 'global_by_type':
                                 new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
@@ -583,7 +600,7 @@ class SomaticMutationCaller:
                                 new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * ((other_p_prior+p_prior)/2)
                         else:
                             assert False, f'unknown mean_type parameter: {self.mean_type}'
-                    if self.mean_type == "geometric" and self.BQ_freq_method == 'global':
+                    if self.mean_type == "geometric" and self.BQ_freq_method in ['global', 'local']:
                         new_p_prior += self.N_rate * math.sqrt(p_prior)
 
                     assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
