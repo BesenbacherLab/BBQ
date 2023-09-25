@@ -51,6 +51,8 @@ def get_parser():
         help="Ignore bases in the first M or last M positions in the read")
     read_filter_parent.add_argument('--max_mismatch', type=int, default=1, metavar="M",
         help="Ignore alt reads if the read has more than M mismatches to the reference")
+    read_filter_parent.add_argument('--min_MQ', type=int, default=60,
+        help="Minimum base quality to considder")
 
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
@@ -122,8 +124,6 @@ def get_parser():
     call_parent.add_argument('--N_rate', type=float, default=0.0,
         help="Rate of N (non-call) bases")
     call_parent.add_argument('--min_BQ', type=int, default=1,
-        help="Minimum base quality to considder")
-    call_parent.add_argument('--min_MQ', type=int, default=60,
         help="Minimum base quality to considder")
     call_parent.add_argument('--filter_max_count', type=int, default=2,
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
@@ -220,9 +220,11 @@ def run_get_good_and_bad_w_filter(opts):
             opts.bam_file, 
             opts.twobit_file, 
             opts.filter_bam_file,
+            opts.min_MQ,
             radius = opts.radius,
             min_enddist = opts.min_enddist,
             max_mismatch = opts.max_mismatch)
+    
     if opts.chrom is None:
         good_kmers, bad_kmers = \
             counter.count_mutations_all_chroms()
