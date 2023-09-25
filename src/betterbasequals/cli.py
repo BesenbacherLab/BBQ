@@ -47,7 +47,7 @@ def get_parser():
     filter_parent.add_argument("--filter_bam_file", help="bam file from blood")
     
     read_filter_parent = argparse.ArgumentParser(add_help=False)
-    read_filter_parent.add_argument('--min_enddist', type=int, default=6, metavar="M",
+    read_filter_parent.add_argument('--min_enddist', type=int, default=5, metavar="M",
         help="Ignore bases in the first M or last M positions in the read")
     read_filter_parent.add_argument('--max_mismatch', type=int, default=1, metavar="M",
         help="Ignore alt reads if the read has more than M mismatches to the reference")
@@ -115,7 +115,7 @@ def get_parser():
         help="Method used to calculate variant quality scores")
     call_parent.add_argument('--cutoff', type=float, default=None, metavar='Q',
         help="Only print variants with quality above Q.")
-    call_parent.add_argument('--prior_N', type=float, default=100,
+    call_parent.add_argument('--prior_N', type=float, default=500,
         help="Weight (as sample size) of the kmer based prior on error rate.")
     call_parent.add_argument('--no_update',  action='store_true',
         help="Do not make bayesian update of error rate but use rate only estimated from kmers")
@@ -123,7 +123,7 @@ def get_parser():
         help="Rate of N (non-call) bases")
     call_parent.add_argument('--min_BQ', type=int, default=1,
         help="Minimum base quality to considder")
-    call_parent.add_argument('--min_MQ', type=int, default=50,
+    call_parent.add_argument('--min_MQ', type=int, default=60,
         help="Minimum base quality to considder")
     call_parent.add_argument('--filter_max_count', type=int, default=2,
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
