@@ -368,7 +368,7 @@ def print_kmer_papas(opts, kmer_papas):
 #                     print(bqual, mtype, kmer, bad_kmers[bqual][mtype][kmer], file = opts.output_file_bad)
 #         opts.output_file_bad.close()
 
-def print_good_and_bad(opts, good_kmers, bad_kmers):
+def print_good_and_bad(opts, good_kmers, bad_kmers, single_kmers):
     if not opts.output_file_good is None:
         for tup, count in good_kmers.items():
             bqual, mtype, kmer = tup
@@ -379,6 +379,11 @@ def print_good_and_bad(opts, good_kmers, bad_kmers):
             bqual, mtype, kmer = tup
             print(bqual, mtype, kmer, count , file = opts.output_file_bad)
         opts.output_file_bad.close()
+    if not opts.output_file_single is None:
+        for tup, count in single_kmers.items():
+            bqual, mtype, kmer = tup
+            print(bqual, mtype, kmer, count , file = opts.output_file_single)
+        opts.output_file_single.close()
 
 def parse_opts_region(opts):
     if opts.region is None:
