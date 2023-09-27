@@ -464,9 +464,9 @@ def main(args = None):
         return 1
 
     if not opts.command in ['train_only', 'validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
-        good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
+        good_kmers, bad_kmers, single_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command in ['train_only', 'test_kmerpapa']:
-        good_kmers, bad_kmers, single_kmers = read_kmers(opts)
+        good_kmers, bad_kmers = read_kmers(opts)
 
     if opts.command == 'count':
         return 0
