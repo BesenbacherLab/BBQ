@@ -217,10 +217,10 @@ class MutationCounterWFilter:
                     if mem_read.allel == ref:
                         event_list.append(('good', read.allel, mem_read.base_qual))
 
-                    if read.allel != ref and mem_read.allel == ref and mem_read.base_qual > 30:
+                    if read.allel != ref and mem_read.allel == ref:# and mem_read.base_qual > 30:
                         event_list.append(('bad', read.allel, read.base_qual))
 
-                    elif mem_read.allel != ref and read.allel == ref and read.base_qual > 30:
+                    elif mem_read.allel != ref and read.allel == ref:# and read.base_qual > 30:
                         event_list.append(('bad', mem_read.allel, mem_read.base_qual))
 
             else:            
@@ -228,8 +228,7 @@ class MutationCounterWFilter:
         
         # Handle reads without partner (ie. no overlap)
         for read in reads_mem.values():
-            if read.allel == ref:
-                event_list.append(('singleton', read.allel, read.base_qual))
+            event_list.append(('singleton', read.allel, read.base_qual))
 
         if coverage < self.min_depth or coverage > self.max_depth:
             return
