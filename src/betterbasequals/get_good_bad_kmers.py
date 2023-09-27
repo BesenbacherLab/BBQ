@@ -139,7 +139,7 @@ class MutationCounterWFilter:
             for pileupcolumn in pileup:
                 self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, singletons)
         
-        return good_kmers, bad_kmers
+        return good_kmers, bad_kmers, singletons
 
     def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, singletons, major_allele = None):
         ref_pos = pileupcolumn.reference_pos
