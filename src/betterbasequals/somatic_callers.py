@@ -648,15 +648,15 @@ class SomaticMutationCaller:
             for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair in events[A]:
                 muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
                 muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-                posterior_from_A = new_mut_probs[read_BQ][muttype_from_A][kmer_from_A]
-                posterior_from_R = new_mut_probs[read_BQ][muttype_from_R][kmer_from_R]
+                posterior_from_A = new_mut_probs[BQ_pair][muttype_from_A][kmer_from_A]
+                posterior_from_R = new_mut_probs[BQ_pair][muttype_from_R][kmer_from_R]
 
                 posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
                 if A==X:
                     if type(read_BQ) == tuple:
                         BQ1, BQ2 = read_BQ
                         read_BQ = max(BQ1,BQ2)
-                    BQs[A].append((BQ_pair, posterior_from_R, enddist, has_indel, has_clip, NM, str(BQ_pair)))
+                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str(BQ_pair)))
                 
         return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
 
