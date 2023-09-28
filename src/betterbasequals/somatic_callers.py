@@ -437,6 +437,7 @@ class SomaticMutationCaller:
         n_neg = Counter()
         events = {'A':[], 'C':[], 'G':[], 'T':[]}
         double_combinations = set()
+        seen_BQ = set()
         R = ref
         for pileup_read in pileupcolumn.pileups:
             # test for deletion at pileup
@@ -457,7 +458,8 @@ class SomaticMutationCaller:
                 or read.end is None
             ):
                 continue
-
+            
+            seen_BQ.add(read.base_qual)
 
             # Look for read partner
             if read.query_name in reads_mem:
@@ -494,7 +496,7 @@ class SomaticMutationCaller:
 
                         read_MQ = (read.mapq + mem_read.mapq)/2
                         #if overlap_type == "double":
-                        
+
                         if read.base_qual > mem_read.base_qual:
                             read_BQ = (read.base_qual, mem_read.base_qual)
                             BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
@@ -558,7 +560,7 @@ class SomaticMutationCaller:
         relevant_bases = [ref] + list(seen_alt)
 
         # calculate error probabilities for single reads:
-        for BQ in self.mut_probs:
+        for BQ in seen_BQ:
             new_mut_probs[BQ] = defaultdict(dict)
 
             for from_base in relevant_bases:
@@ -570,7 +572,7 @@ class SomaticMutationCaller:
                     change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
 
                     new_p_prior = 0
-                    for other_BQ in self.mut_probs:
+                    for other_BQ in seen_BQ:
                         if BQ > other_BQ:                                               
                             BQ_pair = f'({BQ},{other_BQ})'
                         else:
