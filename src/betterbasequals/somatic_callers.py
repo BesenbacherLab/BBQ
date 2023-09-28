@@ -542,7 +542,11 @@ class SomaticMutationCaller:
             
             for A in alts:
                 events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
-            
+
+        if len(seen_alt) == 0:
+            return {}, {}, n_mismatch, n_double, n_pos, n_neg
+
+
         new_mut_probs = defaultdict(dict)
 
         #I only need to calculate probabilities of changing bases from one of the seen alleles.
@@ -647,9 +651,10 @@ class SomaticMutationCaller:
                 new_mut_probs[(BQ1,BQ2)][stay_type][stay_kmer] = p2phred(p_rest)    
 
 
-        posterior_base_probs = {'A':[], 'C':[], 'G':[], 'T':[]}
+        posterior_base_probs = {}
         BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
         for A in seen_alt:
+            posterior_base_probs[A] = []
             for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair in events[A]:
                 muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
                 muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
