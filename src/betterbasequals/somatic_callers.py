@@ -175,7 +175,7 @@ class SomaticMutationCaller:
                         a,b  = kmer_papa[BQ][muttype][kmer]
                         BQ_freq_pair[BQ] += a + b
 
-            self.BO_freq[37] = 2*BQ_freq_pair['(37,37)'] + BQ_freq_pair['(37,25)'] + BQ_freq_pair['(37,11)']
+            self.BQ_freq[37] = 2*BQ_freq_pair['(37,37)'] + BQ_freq_pair['(37,25)'] + BQ_freq_pair['(37,11)']
             self.BQ_freq[25] = 2*BQ_freq_pair['(25,25)'] + BQ_freq_pair['(37,25)'] + BQ_freq_pair['(25,11)']
             self.BQ_freq[11] = 2*BQ_freq_pair['(11,11)'] + BQ_freq_pair['(37,11)'] + BQ_freq_pair['(25,11)']
 
