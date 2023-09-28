@@ -201,20 +201,25 @@ class MutationCounterWFilter:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
 
-                if read.allel == mem_read.allel:
-                    event_list.append(('good', read.allel, read.base_qual))
-                    event_list.append(('good', read.allel, mem_read.base_qual))
+                if read.base_qual > mem_read.base_qual:
+                    BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
+                else:
+                    BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
+
+                if read.allel == mem_read.allel:                  
+                    
+                    event_list.append(('good', read.allel, BQ_pair))
                     
                     if max(read.base_qual, mem_read.base_qual) > 30:
                         has_good.add(read.allel)
 
                 else:
 
-                    if read.allel != ref:
-                        event_list.append(('bad', read.allel, read.base_qual))
+                    if read.allel != ref and mem_read.allel == ref:
+                        event_list.append(('bad', read.allel, BQ_pair))
 
-                    elif mem_read.allel != ref:
-                        event_list.append(('bad', mem_read.allel, mem_read.base_qual))
+                    elif mem_read.allel != ref and read.allel == ref:
+                        event_list.append(('bad', mem_read.allel, BQ_pair))
             else:            
                 reads_mem[read.query_name] = read
 

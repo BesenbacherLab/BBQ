@@ -496,7 +496,7 @@ class SomaticMutationCaller:
                         else:
                             read_BQ = (mem_read.base_qual, read.base_qual)
                             BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
-                        double_combinations.add(read_BQ)
+                        double_combinations.add(BQ_pair)
                         enddist = max(read.enddist, mem_read.enddist)
                         has_indel = max(read.has_indel, mem_read.has_indel)
                         has_clip = max(read.has_clip, mem_read.has_clip)
@@ -541,7 +541,7 @@ class SomaticMutationCaller:
                     n_pos[X] += 1
             
             for A in alts:
-                events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
+                events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, read.base_qual))
         
         if len(seen_alt) == 0:
             return {}, {}, n_mismatch, n_double, n_pos, n_neg
@@ -563,30 +563,25 @@ class SomaticMutationCaller:
                     if to_base == from_base:
                         continue
                     change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                    alpha, beta = self.mut_probs[BQ][change_type][change_kmer]
-                    p_prior = alpha / (alpha + beta)
+
                     new_p_prior = 0
                     for other_BQ in self.mut_probs:
-                        other_alpha, other_beta = self.mut_probs[other_BQ][change_type][change_kmer]
-                        other_p_prior = other_alpha / (other_alpha + other_beta)
-
-                        if self.mean_type == "geometric":
-                            if self.BQ_freq_method == 'global':
-                                new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
-                            elif self.BQ_freq_method == 'global_by_type':
-                                new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
-                            elif self.BQ_freq_method == 'global_by_base':
-                                new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * math.sqrt(other_p_prior*p_prior)
-                        elif self.mean_type == "arithmetric":
-                            if self.BQ_freq_method == 'global':
-                                new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
-                            elif self.BQ_freq_method == 'global_by_type':
-                                new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
-                            elif self.BQ_freq_method == 'global_by_base':
-                                new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * ((other_p_prior+p_prior)/2)
+                        if BQ > other_BQ:                                               
+                            BQ_pair = f'({BQ},{other_BQ})'
                         else:
-                            assert False, f'unknown mean_type parameter: {self.mean_type}'
-                    if self.mean_type == "geometric" and self.BQ_freq_method == 'global':
+                            BQ_pair = f'({other_BQ},{BQ})'
+
+                        alpha, beta = self.mut_probs[BQ_pair][change_type][change_kmer]
+                        p_prior = alpha / (alpha + beta)
+
+                        if self.BQ_freq_method == 'global':
+                            new_p_prior += self.BQ_freq[other_BQ] * p_prior
+                        elif self.BQ_freq_method == 'global_by_type':
+                            new_p_prior += self.BQ_freq[other_BQ][change_type] * p_prior
+                        elif self.BQ_freq_method == 'global_by_base':
+                            new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * p_prior
+
+                    if self.BQ_freq_method == 'global':
                         new_p_prior += self.N_rate * math.sqrt(p_prior)
 
                     assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
@@ -608,8 +603,8 @@ class SomaticMutationCaller:
     
 
         # calculate error rates for double reads:
-        for BQ1, BQ2 in double_combinations:
-            new_mut_probs[(BQ1,BQ2)] = defaultdict(dict)
+        for BQ_pair in double_combinations:
+            new_mut_probs[BQ_pair] = defaultdict(dict)
 
             for from_base in relevant_bases:
                 p_rest = 1.0
@@ -619,22 +614,11 @@ class SomaticMutationCaller:
                         continue
                     change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
 
-                    alpha1, beta1 = self.mut_probs[BQ1][change_type][change_kmer]
-                    alpha2, beta2 = self.mut_probs[BQ2][change_type][change_kmer]
-                
-                    p_prior_1 = alpha1 / (alpha1 + beta1)
-                    p_prior_2 = alpha2 / (alpha2 + beta2)
+                    alpha, beta = self.mut_probs[BQ_pair][change_type][change_kmer]
 
-                    if self.mean_type == "geometric":
-                        new_p_prior = math.sqrt(p_prior_1 * p_prior_2)
-                    elif self.mean_type == "arithmetric":
-                        new_p_prior = ((p_prior_1 + p_prior_2)/2)
-                    else:
-                        assert False, f'unknown mean_type parameter: {self.mean_type}'
+                    p_prior = alpha / (alpha + beta)
 
-                    assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
-
-                    a = new_p_prior * self.prior_N
+                    a = p_prior * self.prior_N
                     b = self.prior_N - a
                     if self.no_update or from_base != ref:
                         p_posterior = a/(a + b)
@@ -644,10 +628,10 @@ class SomaticMutationCaller:
 
                     assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
                     #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                    new_mut_probs[(BQ1,BQ2)][change_type][change_kmer] = p2phred(p_posterior)
+                    new_mut_probs[BQ_pair][change_type][change_kmer] = p2phred(p_posterior)
 
                 assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
-                new_mut_probs[(BQ1,BQ2)][stay_type][stay_kmer] = p2phred(p_rest)    
+                new_mut_probs[BQ_pair][stay_type][stay_kmer] = p2phred(p_rest)    
 
 
         posterior_base_probs = {}
@@ -665,7 +649,7 @@ class SomaticMutationCaller:
                     if type(read_BQ) == tuple:
                         BQ1, BQ2 = read_BQ
                         read_BQ = max(BQ1,BQ2)
-                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
+                    BQs[A].append((BQ_pair, posterior_from_R, enddist, has_indel, has_clip, NM, str(BQ_pair)))
                 
         return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
 

@@ -268,7 +268,7 @@ def read_kmers(opts):
     good_kmers = {}
     for line in opts.input_file_good:
         bqual, mtype, kmer, count = line.split()
-        bqual = int(bqual)
+        #bqual = int(bqual)
         if bqual not in good_kmers:
             good_kmers[bqual] = {}
             for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
@@ -280,7 +280,7 @@ def read_kmers(opts):
         bqual, mtype, kmer, count = line.split()
         if count == "0":
             continue
-        bqual = int(bqual)
+        #bqual = int(bqual)
         if bqual not in bad_kmers:
             bad_kmers[bqual] = {}
             for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
@@ -319,7 +319,7 @@ def read_kmer_papas(opts):
         bqual, mtype, pattern, alpha, beta = line.split()
         alpha = float(alpha)
         beta = float(beta)
-        bqual=int(bqual)
+        #bqual=int(bqual)
         if bqual not in kmer_papas:
             kmer_papas[bqual] = {}
         if mtype not in kmer_papas[bqual]:
@@ -334,7 +334,7 @@ def read_kmer_papas_for_test(opts):
         bqual, mtype, pattern, alpha, beta = line.split()
         alpha = float(alpha)
         beta = float(beta)
-        bqual=int(bqual)
+        #bqual=int(bqual)
         if bqual not in kmer_papas:
             kmer_papas[bqual] = {}
         if mtype not in kmer_papas[bqual]:
