@@ -167,13 +167,18 @@ class SomaticMutationCaller:
             assert (self.BQ_freq[11]['A'] + self.BQ_freq[25]['A'] + self.BQ_freq[37]['A']) -1.0 < 1e-7
         elif BQ_freq_method == 'global':
             self.BQ_freq = {}
+            BQ_freq_pair = {}
             for BQ in kmer_papa:
-                self.BQ_freq[BQ] = 0
+                BQ_freq_pair[BQ] = 0
                 for muttype in kmer_papa[BQ]:                
                     for kmer in kmer_papa[BQ][muttype]:
                         a,b  = kmer_papa[BQ][muttype][kmer]
-                        self.BQ_freq[BQ] += a + b
-        
+                        BQ_freq_pair[BQ] += a + b
+
+            self.BO_freq[37] = 2*BQ_freq_pair['(37,37)'] + BQ_freq_pair['(37,25)'] + BQ_freq_pair['(37,11)']
+            self.BQ_freq[25] = 2*BQ_freq_pair['(25,25)'] + BQ_freq_pair['(37,25)'] + BQ_freq_pair['(25,11)']
+            self.BQ_freq[11] = 2*BQ_freq_pair['(11,11)'] + BQ_freq_pair['(37,11)'] + BQ_freq_pair['(25,11)']
+
             total_sum = sum(self.BQ_freq.values())
             total_sum += (N_rate*total_sum)/(1-N_rate)
             for BQ in self.BQ_freq:
