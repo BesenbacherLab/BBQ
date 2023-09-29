@@ -69,12 +69,14 @@ class MutationCounterWFilter:
     def count_mutations_all_chroms(self):
         good_kmers = Counter()
         bad_kmers = Counter()
+        single_kmers = Counter()
         for idx_stats in self.bam_file.get_index_statistics():
             if idx_stats.mapped > 0:
-                good_c, bad_c = self.count_mutations(idx_stats.contig, None, None)
+                good_c, bad_c, single_c = self.count_mutations(idx_stats.contig, None, None)
                 good_kmers += good_c
                 bad_kmers += bad_c
-        return good_kmers, bad_kmers
+                single_kmers += single_c
+        return good_kmers, bad_kmers, single_kmers
 
 
     def count_mutations(self, chrom, start, stop):
@@ -86,6 +88,7 @@ class MutationCounterWFilter:
         #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
         good_kmers = Counter()
         bad_kmers = Counter()
+        singletons = Counter()
 
         pileup = self.bam_file.pileup(
             contig = chrom,
@@ -131,14 +134,14 @@ class MutationCounterWFilter:
                 else:
                     major = n_alleles.most_common(1)[0]
 
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, major[0])
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, singletons, major[0])
         else:
             for pileupcolumn in pileup:
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers)
+                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, singletons)
         
-        return good_kmers, bad_kmers
+        return good_kmers, bad_kmers, singletons
 
-    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, major_allele = None):
+    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, singletons, major_allele = None):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
@@ -222,6 +225,10 @@ class MutationCounterWFilter:
                         event_list.append(('bad', mem_read.allel, BQ_pair))
             else:            
                 reads_mem[read.query_name] = read
+        
+        # Handle reads without partner (ie. no overlap)
+        for read in reads_mem.values():
+            event_list.append(('singleton', read.allel, read.base_qual))
 
         if coverage < self.min_depth or coverage > self.max_depth:
             return
@@ -257,4 +264,7 @@ class MutationCounterWFilter:
 
             elif event_type == 'bad':
                 bad_kmers[(base_qual, mut_type, kmer)] += 1
+
+            elif event_type == 'singleton':
+                singletons[(base_qual, mut_type, kmer)] += 1
 

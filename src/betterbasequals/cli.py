@@ -58,6 +58,7 @@ def get_parser():
     count_parent = argparse.ArgumentParser(add_help=False)
     count_parent.add_argument("--output_file_good", type=argparse.FileType('w'))
     count_parent.add_argument("--output_file_bad", type=argparse.FileType('w'))
+    count_parent.add_argument("--output_file_single", type=argparse.FileType('w'))
     count_parent.add_argument("--radius", type=int, default=3)
     count_parent.add_argument('--min_depth', type=int, default=1,
         help="mminimum depth at a site to be considered as training data")
@@ -226,32 +227,40 @@ def run_get_good_and_bad_w_filter(opts):
             max_mismatch = opts.max_mismatch)
     
     if opts.chrom is None:
-        good_kmers, bad_kmers = \
+        good_kmers, bad_kmers, single_kmers = \
             counter.count_mutations_all_chroms()
     else:
-        good_kmers, bad_kmers = \
+        good_kmers, bad_kmers, single_kmers = \
             counter.count_mutations(opts.chrom, opts.start, opts.end)
-    print_good_and_bad(opts, good_kmers, bad_kmers)
+    print_good_and_bad(opts, good_kmers, bad_kmers, single_kmers)
     
     #change format of dicts to nested dicts
     BQs_good = set(x[0] for x in good_kmers)
     BQs_bad = set(x[0] for x in bad_kmers)
+    BQs_single = set(x[0] for x in single_kmers)
     good_kmers2 = {}
     bad_kmers2 = {}
-    for BQ in BQs_good | BQs_bad:
+    single_kmers2 = {}
+    for BQ in BQs_good | BQs_bad | BQs_single:
         good_kmers2[BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
             good_kmers2[BQ][mtype] = defaultdict(int)
         bad_kmers2[BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             bad_kmers2[BQ][mtype] = defaultdict(int)
+        single_kmers2[BQ] = {}
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
+            single_kmers2[BQ][mtype] = defaultdict(int)
     for tup, count in good_kmers.items():
         BQ, mtype, kmer = tup
         good_kmers2[BQ][mtype][kmer] = count
     for tup, count in bad_kmers.items():
         BQ, mtype, kmer = tup
         bad_kmers2[BQ][mtype][kmer] = count
-    return good_kmers2, bad_kmers2
+    for tup, count in single_kmers.items():
+        BQ, mtype, kmer = tup
+        single_kmers2[BQ][mtype][kmer] = count
+    return good_kmers2, bad_kmers2, single_kmers2
 
 
 def run_get_kmerpapas(opts, good_kmers, bad_kmers):
@@ -455,7 +464,7 @@ def main(args = None):
         return 1
 
     if not opts.command in ['train_only', 'validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
-        good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
+        good_kmers, bad_kmers, single_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command in ['train_only', 'test_kmerpapa']:
         good_kmers, bad_kmers = read_kmers(opts)
 
