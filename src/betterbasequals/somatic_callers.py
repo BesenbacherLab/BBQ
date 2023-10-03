@@ -109,8 +109,6 @@ class SomaticMutationCaller:
         pop_vcf = None,
         min_enddist = 6,
         max_mismatch = 2,
-        mean_type = "arithmetric",
-        BQ_freq_method = 'global',
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
@@ -133,71 +131,6 @@ class SomaticMutationCaller:
 
         self.outfile = outfile
         self.method = method
-        self.BQ_freq_method = BQ_freq_method
-
-        if BQ_freq_method == 'global_by_type':
-            self.BQ_freq = {}
-            for BQ in kmer_papa:
-                self.BQ_freq[BQ] = {}
-                for muttype in kmer_papa[BQ]:
-                    self.BQ_freq[BQ][muttype] = 0
-                    for kmer in kmer_papa[BQ][muttype]:
-                        a,b  = kmer_papa[BQ][muttype][kmer]
-                        self.BQ_freq[BQ][muttype] += a + b
-            
-            for muttype in change_mtypes:
-                total_sum = sum(self.BQ_freq[BQ][muttype] for BQ in self.BQ_freq)
-                for BQ in self.BQ_freq:
-                    self.BQ_freq[BQ][muttype] = self.BQ_freq[BQ][muttype]/total_sum
-
-            assert (self.BQ_freq[11]['A->C'] + self.BQ_freq[25]['A->C'] + self.BQ_freq[37]['A->C']) -1.0 < 1e-7
-        elif BQ_freq_method == 'global_by_base':
-            self.BQ_freq = {}
-            for BQ in kmer_papa:
-                self.BQ_freq[BQ] = {'A':0, 'C':0}
-                for muttype in kmer_papa[BQ]:
-                    for kmer in kmer_papa[BQ][muttype]:
-                        a,b  = kmer_papa[BQ][muttype][kmer]
-                        self.BQ_freq[BQ][muttype[0]] += a + b
-            
-            for base in ['A', 'C']:
-                total_sum = sum(self.BQ_freq[BQ][base] for BQ in self.BQ_freq)
-                for BQ in self.BQ_freq:
-                    self.BQ_freq[BQ][base] = self.BQ_freq[BQ][base]/total_sum
-            assert (self.BQ_freq[11]['A'] + self.BQ_freq[25]['A'] + self.BQ_freq[37]['A']) -1.0 < 1e-7
-        elif BQ_freq_method == 'global':
-            self.BQ_freq = {}
-            for BQ in kmer_papa:
-                self.BQ_freq[BQ] = 0
-                for muttype in kmer_papa[BQ]:                
-                    for kmer in kmer_papa[BQ][muttype]:
-                        a,b  = kmer_papa[BQ][muttype][kmer]
-                        self.BQ_freq[BQ] += a + b
-        
-            total_sum = sum(self.BQ_freq.values())
-            total_sum += (N_rate*total_sum)/(1-N_rate)
-            for BQ in self.BQ_freq:
-                self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
-            
-            assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37] + N_rate) -1.0 < 1e-7
-        else:
-            assert False, f'Unknown BQ_freq_method : {BQ_freq_method}'
-
-        #This should be handled in pileup code now.
-        #if self.method == 'LR':
-            # make sure that all X->X are also in kmerpapa
-            # mtype_tups = ('C->C', ('C->A', 'C->G', 'C->T')), ('A->A', ('A->C', 'A->G', 'A->T'))
-            # for BQ in self.mut_probs:
-            #     for stay_type, change_types in mtype_tups:
-            #         self.mut_probs[BQ][stay_type] = {}
-            #         for kmer in self.mut_probs[BQ][change_types[0]]:
-            #             p = 1.0
-            #             for change_type in change_types:
-            #                 #TODO: should we use log-sum-exp function for numerical stability?
-            #                 #p -= phred2p(self.mut_probs[BQ][change_type][kmer])
-            #                 alpha,beta = self.mut_probs[BQ][change_type][kmer]
-            #                 p -= alpha/(alpha+beta)
-            #             self.mut_probs[BQ][stay_type][kmer] = (p, None)
 
         self.cutoff = cutoff
         self.prior_N = prior_N
@@ -211,7 +144,6 @@ class SomaticMutationCaller:
 
         self.min_enddist = min_enddist
         self.max_mismatch = max_mismatch
-        self.mean_type = mean_type
         self.mapq = mapq
         self.min_base_qual = min_base_qual
         self.filter_mapq = filter_mapq
@@ -228,16 +160,6 @@ class SomaticMutationCaller:
         self.min_filter_depth = 10
         self.max_filter_depth = 1000000
         self.min_filter_count = min_filter_count
-
-        # Create correction factor dict:
-
-        # self.correction_factor = {mtype:{} for mtype in kmer_papa}
-        # print(self.correction)
-        # for mtype in kmer_papa:
-        #     for kmer in kmer_papa[mtype]:
-        #         p = kmer_papa[mtype][kmer]
-        #         self.correction_factor[mtype][kmer] = -10*log10(p/(p-1))
-        #         #self.correction_factor[mtype][kmer] = -10*log10(p)
                 
 
     def __del__(self):
@@ -432,6 +354,7 @@ class SomaticMutationCaller:
         n_neg = Counter()
         events = {'A':[], 'C':[], 'G':[], 'T':[]}
         double_combinations = set()
+        observed_BQs = set()
         R = ref
         for pileup_read in pileupcolumn.pileups:
             # test for deletion at pileup
@@ -496,7 +419,9 @@ class SomaticMutationCaller:
                         else:
                             read_BQ = (mem_read.base_qual, read.base_qual)
                             BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
-                        double_combinations.add(read_BQ)
+                        #double_combinations.add(read_BQ)
+                        #double_combinations.add(BQ_pair)
+                        observed_BQs.add(BQ_pair)
                         enddist = max(read.enddist, mem_read.enddist)
                         has_indel = max(read.has_indel, mem_read.has_indel)
                         has_clip = max(read.has_clip, mem_read.has_clip)
@@ -541,6 +466,7 @@ class SomaticMutationCaller:
                     n_pos[X] += 1
             
             for A in alts:
+                observed_BQs.add(str(read.base_qual))
                 events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
 
         if len(seen_alt) == 0:
@@ -553,8 +479,8 @@ class SomaticMutationCaller:
         # I have to considder change to all bases to calculate stay types (X->X) correctly.
         relevant_bases = [ref] + list(seen_alt)
 
-        # calculate error probabilities for single reads:
-        for BQ in self.mut_probs:
+        # Do positional update of error rates:
+        for BQ in observed_BQs:
             new_mut_probs[BQ] = defaultdict(dict)
 
             for from_base in relevant_bases:
@@ -564,35 +490,10 @@ class SomaticMutationCaller:
                     if to_base == from_base:
                         continue
                     change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                    alpha, beta = self.mut_probs[BQ][change_type][change_kmer]
-                    p_prior = alpha / (alpha + beta)
-                    new_p_prior = 0
-                    for other_BQ in self.mut_probs:
-                        other_alpha, other_beta = self.mut_probs[other_BQ][change_type][change_kmer]
-                        other_p_prior = other_alpha / (other_alpha + other_beta)
 
-                        if self.mean_type == "geometric":
-                            if self.BQ_freq_method == 'global':
-                                new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
-                            elif self.BQ_freq_method == 'global_by_type':
-                                new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
-                            elif self.BQ_freq_method == 'global_by_base':
-                                new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * math.sqrt(other_p_prior*p_prior)
-                        elif self.mean_type == "arithmetric":
-                            if self.BQ_freq_method == 'global':
-                                new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
-                            elif self.BQ_freq_method == 'global_by_type':
-                                new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
-                            elif self.BQ_freq_method == 'global_by_base':
-                                new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * ((other_p_prior+p_prior)/2)
-                        else:
-                            assert False, f'unknown mean_type parameter: {self.mean_type}'
-                    if self.mean_type == "geometric" and self.BQ_freq_method == 'global':
-                        new_p_prior += self.N_rate * math.sqrt(p_prior)
+                    p_prior = self.mut_probs[BQ][change_type][change_kmer]
 
-                    assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
-
-                    a = new_p_prior * self.prior_N
+                    a = p_prior * self.prior_N
                     b = self.prior_N - a
                     if self.no_update or from_base != ref:
                         p_posterior = a/(a + b)
@@ -605,68 +506,25 @@ class SomaticMutationCaller:
                     new_mut_probs[BQ][change_type][change_kmer] = p2phred(p_posterior)
 
                 assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
-                new_mut_probs[BQ][stay_type][stay_kmer] = p2phred(p_rest)
-    
-
-        # calculate error rates for double reads:
-        for BQ1, BQ2 in double_combinations:
-            new_mut_probs[(BQ1,BQ2)] = defaultdict(dict)
-
-            for from_base in relevant_bases:
-                p_rest = 1.0
-                stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
-                for to_base in ['A', 'C', 'G', 'T']:
-                    if to_base == from_base:
-                        continue
-                    change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-
-                    alpha1, beta1 = self.mut_probs[BQ1][change_type][change_kmer]
-                    alpha2, beta2 = self.mut_probs[BQ2][change_type][change_kmer]
-                
-                    p_prior_1 = alpha1 / (alpha1 + beta1)
-                    p_prior_2 = alpha2 / (alpha2 + beta2)
-
-                    if self.mean_type == "geometric":
-                        new_p_prior = math.sqrt(p_prior_1 * p_prior_2)
-                    elif self.mean_type == "arithmetric":
-                        new_p_prior = ((p_prior_1 + p_prior_2)/2)
-                    else:
-                        assert False, f'unknown mean_type parameter: {self.mean_type}'
-
-                    assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
-
-                    a = new_p_prior * self.prior_N
-                    b = self.prior_N - a
-                    if self.no_update or from_base != ref:
-                        p_posterior = a/(a + b)
-                    else:
-                        p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                    p_rest -= p_posterior
-
-                    assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
-                    #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                    new_mut_probs[(BQ1,BQ2)][change_type][change_kmer] = p2phred(p_posterior)
-
-                assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
-                new_mut_probs[(BQ1,BQ2)][stay_type][stay_kmer] = p2phred(p_rest)    
+                new_mut_probs[BQ][stay_type][stay_kmer] = p2phred(p_rest)    
 
 
         posterior_base_probs = {}
         BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
         for A in seen_alt:
             posterior_base_probs[A] = []
-            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair in events[A]:
+            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ in events[A]:
                 muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
                 muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-                posterior_from_A = new_mut_probs[read_BQ][muttype_from_A][kmer_from_A]
-                posterior_from_R = new_mut_probs[read_BQ][muttype_from_R][kmer_from_R]
+                posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][kmer_from_A]
+                posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][kmer_from_R]
 
                 posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
                 if A==X:
                     if type(read_BQ) == tuple:
                         BQ1, BQ2 = read_BQ
                         read_BQ = max(BQ1,BQ2)
-                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
+                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
                 
         return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
 

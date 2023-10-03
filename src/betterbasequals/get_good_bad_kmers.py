@@ -11,6 +11,11 @@ def get_mut_type(ref, alt):
         mtype = ref + '->' + alt
     return mtype
 
+def get_BQ_pair(BQ1, BQ2):
+    if BQ1 > BQ2:
+        return f'({BQ1},{BQ2})'
+    else:
+        return f'({BQ2},{BQ1})'
 
 class MutationCounterWFilter:
     def __init__(
@@ -67,28 +72,16 @@ class MutationCounterWFilter:
         self.tb.close()
 
     def count_mutations_all_chroms(self):
-        good_kmers = Counter()
-        bad_kmers = Counter()
-        single_kmers = Counter()
+        event_kmers = Counter()
         for idx_stats in self.bam_file.get_index_statistics():
             if idx_stats.mapped > 0:
-                good_c, bad_c, single_c = self.count_mutations(idx_stats.contig, None, None)
-                good_kmers += good_c
-                bad_kmers += bad_c
-                single_kmers += single_c
-        return good_kmers, bad_kmers, single_kmers
+                event_c = self.count_mutations(idx_stats.contig, None, None)
+                event_kmers += event_c
+        return event_kmers
 
 
     def count_mutations(self, chrom, start, stop):
-        #if self.base_quals is None:
-        #    good_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
-        #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
-        #else:
-        #    good_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
-        #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
-        good_kmers = Counter()
-        bad_kmers = Counter()
-        singletons = Counter()
+        event_kmers = Counter()
 
         pileup = self.bam_file.pileup(
             contig = chrom,
@@ -134,14 +127,14 @@ class MutationCounterWFilter:
                 else:
                     major = n_alleles.most_common(1)[0]
 
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, singletons, major[0])
+                self.handle_pileup(pileupcolumn, event_kmers, major[0])
         else:
             for pileupcolumn in pileup:
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, singletons)
+                self.handle_pileup(pileupcolumn, event_kmers)
         
-        return good_kmers, bad_kmers, singletons
+        return event_kmers
 
-    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, singletons, major_allele = None):
+    def handle_pileup(self, pileupcolumn, event_kmers, major_allele = None):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
@@ -206,22 +199,23 @@ class MutationCounterWFilter:
 
                 if read.allel == mem_read.allel:
                     event_list.append(('good', read.allel, read.base_qual))
-                    event_list.append(('good', read.allel, mem_read.base_qual))
+                    event_list.append(('good', mem_read.allel, mem_read.base_qual))
                     
+                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
+
                     if max(read.base_qual, mem_read.base_qual) > 30:
                         has_good.add(read.allel)
 
                 else:
-                    if read.allel == ref:
-                        event_list.append(('good', read.allel, read.base_qual))
-                    if mem_read.allel == ref:
-                        event_list.append(('good', read.allel, mem_read.base_qual))
-
                     if read.allel != ref and mem_read.allel == ref:# and mem_read.base_qual > 30:
                         event_list.append(('bad', read.allel, read.base_qual))
+                        event_list.append(('good', mem_read.allel, mem_read.base_qual))
+                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
 
                     elif mem_read.allel != ref and read.allel == ref:# and read.base_qual > 30:
                         event_list.append(('bad', mem_read.allel, mem_read.base_qual))
+                        event_list.append(('good', read.allel, read.base_qual))
+                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
 
             else:            
                 reads_mem[read.query_name] = read
@@ -258,13 +252,6 @@ class MutationCounterWFilter:
 
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
-
-            if event_type == 'good':
-                good_kmers[(base_qual, mut_type, kmer)] += 1
-
-            elif event_type == 'bad':
-                bad_kmers[(base_qual, mut_type, kmer)] += 1
-
-            elif event_type == 'singleton':
-                singletons[(base_qual, mut_type, kmer)] += 1
+            
+            event_kmers[(event_type, base_qual, mut_type, kmer)] += 1
 
