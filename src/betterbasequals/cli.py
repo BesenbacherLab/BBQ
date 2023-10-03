@@ -272,7 +272,7 @@ def run_get_kmerpapas(opts, event_kmers):
             eprint(f'Handling base_qual: {BQ_pair}, muttype: {mtype}')
             for kmer in matches(super_pattern):
                 n_errors = event_kmers[('bad', bqual, mtype, kmer)]
-                n_not_error = event_kmers[('good', bqual, mtype, kmer)]
+                n_not_error = event_kmers[('good', bqual, notype, kmer)]
                 if not opts.same_good:
                     n_not_error += event_kmers[('bad', bqual, other_type1, kmer)]
                     n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
