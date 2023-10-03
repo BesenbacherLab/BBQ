@@ -225,7 +225,7 @@ def run_get_good_and_bad_w_filter(opts):
     if opts.chrom is None:
         event_kmers = counter.count_mutations_all_chroms()
     else:
-        event_kmers, = counter.count_mutations(opts.chrom, opts.start, opts.end)
+        event_kmers = counter.count_mutations(opts.chrom, opts.start, opts.end)
     print_kmer_counts(opts, event_kmers)
     
     return event_kmers
