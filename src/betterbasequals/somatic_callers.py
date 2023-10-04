@@ -102,7 +102,6 @@ class SomaticMutationCaller:
         cutoff,
         prior_N,
         no_update,
-        N_rate,
         mapq = 50,
         min_base_qual = 1,
         min_filter_count = 2,

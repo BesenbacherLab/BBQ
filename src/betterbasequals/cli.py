@@ -118,8 +118,6 @@ def get_parser():
         help="Weight (as sample size) of the kmer based prior on error rate.")
     call_parent.add_argument('--no_update',  action='store_true',
         help="Do not make bayesian update of error rate but use rate only estimated from kmers")
-    call_parent.add_argument('--N_rate', type=float, default=0.0,
-        help="Rate of N (non-call) bases")
     call_parent.add_argument('--min_BQ', type=int, default=1,
         help="Minimum base quality to considder")
     call_parent.add_argument('--filter_max_count', type=int, default=2,
@@ -129,9 +127,6 @@ def get_parser():
     call_parent.add_argument('--mean_type', type=str,
         choices=['arithmetric', 'geometric'], default="geometric",
         help="How to calculate the mean error probabilty of two matching overlapping alleles")
-    call_parent.add_argument('--BQ_freq_method', type=str,
-        choices=['global', 'global_by_type', 'global_by_base'], default="global",
-        help="How to calculate the probability of seeing a specific BQ")
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -420,15 +415,12 @@ def run_call(opts, kmer_papas):
             opts.cutoff,
             opts.prior_N,
             opts.no_update,
-            opts.N_rate,
             opts.min_MQ,
             opts.min_BQ,
             opts.filter_max_count,
             opts.pop_vcf,
             opts.min_enddist,
             opts.max_mismatch,
-            opts.mean_type,
-            opts.BQ_freq_method,
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()
