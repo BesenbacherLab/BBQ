@@ -430,19 +430,15 @@ class SomaticMutationCaller:
                         has_indel = max(read.has_indel, mem_read.has_indel)
                         has_clip = max(read.has_clip, mem_read.has_clip)
                         NM = max(read.NM, mem_read.NM)
-                        #(read.base_qual, mem_read.base_qual)
-                        fragment_pos = (min(read.start, mem_read.start), max(read.end, mem_read.end))
+                        fragment_id = (min(read.start, mem_read.start), max(read.end, mem_read.end), X)
                         assert read.start < read.end
                         assert mem_read.start < mem_read.end
-                        if fragment_pos not in events[A]:
-                            events[A][fragment_pos] = (X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
+                        if fragment_id not in events[A]:
+                            events[A][fragment_id] = (X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
                         else:
-                            o_read_BQ = events[A][fragment_pos][1]
+                            o_read_BQ = events[A][fragment_id][1]
                             if o_read_BQ < read_BQ:
-                                events[A][fragment_pos] = (X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
-
-
-                
+                                events[A][fragment_id] = (X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
 
                 else: # Mismatch
                     #if not no_update:
@@ -485,13 +481,13 @@ class SomaticMutationCaller:
             
             for A in alts:
                 observed_BQs.add(str(read.base_qual))
-
-                if read.start not in events[A]:
-                    events[A][read.start] = (X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))
+                frag_id = (read.start, X)
+                if frag_id not in events[A]:
+                    events[A][frag_id] = (X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))
                 else:
-                    o_read_BQ = events[A][read.start][1]
+                    o_read_BQ = events[A][frag_id][1]
                     if o_read_BQ < read.base_qual:
-                        events[A][read.start] = (X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))                        
+                        events[A][frag_id] = (X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))                        
 
 
         if len(seen_alt) == 0:
