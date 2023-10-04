@@ -241,7 +241,7 @@ class SomaticMutationCaller:
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
         elif self.method in ['LR','LR_with_MQ']:
-            base_probs, BQs, n_mismatch, n_double, n_pos, n_neg = \
+            base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, filtered_frac = \
                 self.get_alleles_w_probabities_update(pileupcolumn, ref, kmer)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
@@ -331,7 +331,7 @@ class SomaticMutationCaller:
 
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={no_filter_n_mismatch[A]};n_overlap={no_filter_n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};no_filter_n_other={n37_other_nf}{optional_info}', file=self.outfile)
-                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other}{optional_info}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};filtered_frac={filtered_frac}{optional_info}', file=self.outfile)
 
         return n_calls
     
@@ -351,7 +351,10 @@ class SomaticMutationCaller:
         n_pos = Counter()
         n_neg = Counter()
         events = {'A':[], 'C':[], 'G':[], 'T':[]}
-        double_combinations = set()
+
+        n_filtered = 0
+        n_nonfiltered = 0
+
         observed_BQs = set()
         R = ref
         for pileup_read in pileupcolumn.pileups:
@@ -373,12 +376,14 @@ class SomaticMutationCaller:
                 or read.end is None
             ):
                 continue
-
+            
 
             # Look for read partner
             if read.query_name in reads_mem:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
+
+                n_nonfiltered += 1
 
                 # We do not trust mismathces in overlaps so we only add to events list in case of match
                 if read.allel == mem_read.allel:
@@ -394,6 +399,7 @@ class SomaticMutationCaller:
                             reads_mem[read.query_name] = read
                             continue
                         elif (not read.is_good(self.min_enddist, self.max_mismatch)) and (not mem_read.is_good(self.min_enddist, self.max_mismatch)):
+                            n_filtered += 1
                             continue
 
                     if X == R:
@@ -450,8 +456,11 @@ class SomaticMutationCaller:
         for read in reads_mem.values():
             X = read.allel
             if self.filter_reads and not read.is_good(self.min_enddist, self.max_mismatch):
+                n_filtered += 1
                 continue
                 
+            n_nonfiltered += 1
+
             if X == R:
                 alts = [A for A in ['A','C','G','T'] if A!=R]
             else:
@@ -523,7 +532,8 @@ class SomaticMutationCaller:
                         BQ1, BQ2 = read_BQ
                         read_BQ = max(BQ1,BQ2)
                     BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
-                
-        return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
+        
+        
+        return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered/(n_filtered+n_nonfiltered)
 
 
