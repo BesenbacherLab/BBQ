@@ -134,7 +134,6 @@ class SomaticMutationCaller:
         self.cutoff = cutoff
         self.prior_N = prior_N
         self.no_update = no_update
-        self.N_rate = N_rate
 
         if not pop_vcf is None:
             self.pop_vcf = VcfAfReader(pop_vcf)
