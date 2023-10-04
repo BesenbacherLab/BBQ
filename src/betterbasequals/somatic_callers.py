@@ -350,7 +350,7 @@ class SomaticMutationCaller:
         n_double = Counter()
         n_pos = Counter()
         n_neg = Counter()
-        events = {'A':[], 'C':[], 'G':[], 'T':[]}
+        events = {'A':{}, 'C':{}, 'G':{}, 'T':{}}
 
         n_filtered = 0
         n_nonfiltered = 0
@@ -431,7 +431,18 @@ class SomaticMutationCaller:
                         has_clip = max(read.has_clip, mem_read.has_clip)
                         NM = max(read.NM, mem_read.NM)
                         #(read.base_qual, mem_read.base_qual)
-                        events[A].append((X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair))
+                        fragment_pos = (min(read.start, mem_read.start), max(read.end, mem_read.end))
+                        assert read.start < read.end
+                        assert mem_read.start < mem_read.end
+                        if fragment_pos not in events[A]:
+                            events[A][fragment_pos] = (X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
+                        else:
+                            o_read_BQ = events[A][fragment_pos][1]
+                            if o_read_BQ < read_BQ:
+                                events[A][fragment_pos] = (X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
+
+
+                
 
                 else: # Mismatch
                     #if not no_update:
@@ -474,10 +485,17 @@ class SomaticMutationCaller:
             
             for A in alts:
                 observed_BQs.add(str(read.base_qual))
-                events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
+
+                if read.start not in events[A]:
+                    events[A][read.start] = (X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))
+                else:
+                    o_read_BQ = events[A][read.start][1]
+                    if o_read_BQ < read.base_qual:
+                        events[A][read.start] = (X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))                        
+
 
         if len(seen_alt) == 0:
-            return {}, {}, n_mismatch, n_double, n_pos, n_neg
+            return {}, {}, n_mismatch, n_double, n_pos, n_neg, 0
 
 
         new_mut_probs = defaultdict(dict)
@@ -520,7 +538,7 @@ class SomaticMutationCaller:
         BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
         for A in seen_alt:
             posterior_base_probs[A] = []
-            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ in events[A]:
+            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ in events[A].values():
                 muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
                 muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
                 posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][kmer_from_A]
