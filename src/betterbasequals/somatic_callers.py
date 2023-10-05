@@ -77,7 +77,7 @@ def get_BF(base_probs):
     # Bør nok have prior fordeling på alpha så.
     N = len(base_probs)
     N_A = sum(1 for x,y in base_probs if x<y)
-    alpha = res.x
+    alpha = LL
 
     #if N_A > 1:
     #    print(base_probs)
@@ -85,7 +85,7 @@ def get_BF(base_probs):
     #    eprint(f'alpha={res.x} N={N} N_A={N_A}')
     #    print(res.fun, sum(p_r2x for p_a2x, p_r2x in base_probs),  res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs))
     #LR = res.fun - sum(p2phred((1-p_map_error)*phred2p(p_r2x)+p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-    LR = res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs)
+    LR = LL - sum(p_r2x for p_a2x, p_r2x in base_probs)
     return LR, N, N_A, alpha
 
 
@@ -240,7 +240,7 @@ class SomaticMutationCaller:
         elif self.method == 'sum':
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
-        elif self.method in ['LR','LR_with_MQ']:
+        elif self.method in ['LR','LR_with_MQ', 'BF']:
             base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, filtered_frac = \
                 self.get_alleles_w_probabities_update(pileupcolumn, ref, kmer)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
@@ -275,6 +275,8 @@ class SomaticMutationCaller:
                     LR, N, N_A, AF = get_LR(base_probs[A])
                 elif self.method == 'LR_with_MQ':
                     LR, N, N_A, AF = get_LR_with_MQ(base_probs[A])
+                elif self.method == 'BF':
+                    LR, N, N_A, AF = get_BF(base_probs[A])
 
                 QUAL = -LR
                 if self.cutoff is None or QUAL >= self.cutoff:
