@@ -62,7 +62,7 @@ def get_BF(base_probs):
     # It is ok that I use phred scales insted of the usual natural log.
     # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
     def p_data_given_mut(alpha):
-        return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
+        return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x, _ in base_probs)
         
         # If probabilities in base_probs are not phred scaled. It becomes this:
         #return sum(p2phred(alpha * p_a2x + (1-alpha)*p_r2x) for p_a2x, p_r2x in base_probs)
@@ -76,8 +76,7 @@ def get_BF(base_probs):
     LL, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
     # Bør nok have prior fordeling på alpha så.
     N = len(base_probs)
-    N_A = sum(1 for x,y in base_probs if x<y)
-    alpha = LL
+    N_A = sum(1 for x,y,_ in base_probs if x<y)
 
     #if N_A > 1:
     #    print(base_probs)
@@ -85,8 +84,8 @@ def get_BF(base_probs):
     #    eprint(f'alpha={res.x} N={N} N_A={N_A}')
     #    print(res.fun, sum(p_r2x for p_a2x, p_r2x in base_probs),  res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs))
     #LR = res.fun - sum(p2phred((1-p_map_error)*phred2p(p_r2x)+p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-    LR = LL - sum(p_r2x for p_a2x, p_r2x in base_probs)
-    return LR, N, N_A, alpha
+    LR = LL - sum(p_r2x for p_a2x, p_r2x, _ in base_probs)
+    return LR, N, N_A, N_A/N
 
 
 
