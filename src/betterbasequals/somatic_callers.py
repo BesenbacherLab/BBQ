@@ -84,8 +84,11 @@ def get_BF(base_probs):
     #    eprint(f'alpha={res.x} N={N} N_A={N_A}')
     #    print(res.fun, sum(p_r2x for p_a2x, p_r2x in base_probs),  res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs))
     #LR = res.fun - sum(p2phred((1-p_map_error)*phred2p(p_r2x)+p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-    LR = math.log(p_no_alpha) - math.log(p_data_given_mut(0))
-    return LR, N, N_A, N_A/N
+    try:
+        log_BF = math.log(p_no_alpha) - math.log(p_data_given_mut(0))
+    except:
+        log_BF = 0
+    return log_BF, N, N_A, N_A/N
 
 def get_BF_with_MQ(base_probs):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
@@ -95,29 +98,33 @@ def get_BF_with_MQ(base_probs):
         return phred2p(sum(p2phred((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs))
 
     # Integrate out alpha
-    LL, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
+    p_no_alpha, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
     # Bør nok have prior fordeling på alpha så.
     N = len(base_probs)
     N_A = sum(1 for x,y,_ in base_probs if x<y)
-
-    LR = LL - p_data_given_mut(0)
-    return LR, N, N_A, N_A/N
+    try:
+        log_BF = math.log(p_no_alpha) - math.log(p_data_given_mut(0))
+    except:
+        log_BF = 0
+    return log_BF, N, N_A, N_A/N
 
 def get_BF_with_MQ_and_Prior(base_probs, a=1.1, b=10):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
     # It is ok that I use phred scales insted of the usual natural log.
     # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
     def p_data_given_mut(alpha):
-        return scipy.stats.beta.pdf(alpha, a, b) + phred2p(sum(p2phred((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs))
+        return scipy.stats.beta.pdf(alpha, a, b) * phred2p(sum(p2phred((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs))
 
     # Integrate out alpha
-    LL, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
+    p_no_alpha, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
     # Bør nok have prior fordeling på alpha så.
     N = len(base_probs)
     N_A = sum(1 for x,y,_ in base_probs if x<y)
-
-    LR = LL - p_data_given_mut(0)
-    return LR, N, N_A, N_A/N
+    try:
+        log_BF = math.log(p_no_alpha) - math.log(p_data_given_mut(0))
+    except:
+        log_BF = 0
+    return log_BF, N, N_A, N_A/N
 
 
 class SomaticMutationCaller:
