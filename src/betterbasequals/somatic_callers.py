@@ -68,7 +68,7 @@ def get_BF_with_MQ(base_probs):
 
     return log_BF
 
-def get_BF_with_MQ_and_Prior(base_probs, a=1.05, b=3):
+def get_BF_with_MQ_and_Prior(base_probs, a=1, b=2):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
     def p_data_given_mut(alpha):
