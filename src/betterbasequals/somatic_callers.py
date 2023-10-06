@@ -12,7 +12,7 @@ def get_LR(base_probs):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
     def p_data_given_mut(alpha):
-        return sum(math.log(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x, _ in base_probs)
+        return - sum(math.log(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x, _ in base_probs)
         
         # If probabilities in base_probs are not phred scaled. It becomes this:
         #return sum(p2phred(alpha * p_a2x + (1-alpha)*p_r2x) for p_a2x, p_r2x in base_probs)
@@ -20,7 +20,7 @@ def get_LR(base_probs):
     res = minimize_scalar(p_data_given_mut, bounds=(0, 1), method='bounded')
 
     alpha = res.x
-    LR = res.fun - p_data_given_mut(0)
+    LR = - res.fun + p_data_given_mut(0)
     return LR, alpha
 
 def get_LR_with_MQ(base_probs):
@@ -28,11 +28,11 @@ def get_LR_with_MQ(base_probs):
 
     def p_data_given_mut(alpha):
         #return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
-        return sum(math.log((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs)
+        return - sum(math.log((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs)
 
     res = minimize_scalar(p_data_given_mut, bounds=(0, 1), method='bounded')
     alpha = res.x
-    LR = res.fun - p_data_given_mut(0)
+    LR = - res.fun + p_data_given_mut(0)
     return LR, alpha
 
 
