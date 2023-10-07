@@ -315,10 +315,15 @@ class SomaticMutationCaller:
 
                     has_indel = [x[3] for x in BQs[A]]
                     has_clip = [x[4] for x in BQs[A]]
-                    NM = [x[5] for x in BQs[A]]
+                    NM_alt = [x[5] for x in BQs[A]]
+                    NM_ref = [x[5] for x in BQs[ref]]
                     #NM_str = str(NM)
-                    NM.sort()
-                    median_NM = NM[len(NM)//2]
+                    NM_alt.sort()
+                    NM_ref.sort()
+                    median_NM_alt = NM_alt[len(NM_alt)//2]
+                    median_NM_ref = NM_ref[len(NM_ref)//2]
+                    min_NM_alt = min(NM_alt)
+                    min_NM_ref = min(NM_ref)
                     frac_indel = sum(has_indel)/len(has_indel)
                     frac_clip = sum(has_clip)/len(has_clip)
 
@@ -339,7 +344,7 @@ class SomaticMutationCaller:
 
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={no_filter_n_mismatch[A]};n_overlap={no_filter_n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};no_filter_n_other={n37_other_nf}{optional_info}', file=self.outfile)
-                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};filtered_frac={filtered_frac}{optional_info}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};median_alt_NM={median_NM_alt};median_ref_NM={median_NM_ref};min_alt_NM={min_NM_alt};min_ref_NM={min_NM_ref};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};filtered_frac={filtered_frac}{optional_info}', file=self.outfile)
 
         return n_calls
     
@@ -540,7 +545,8 @@ class SomaticMutationCaller:
 
         posterior_base_probs = {}
         BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
-        for A in seen_alt:
+
+        for i,A in enumerate(seen_alt):
             posterior_base_probs[A] = []
             for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ in events[A].values():
                 muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
@@ -549,12 +555,14 @@ class SomaticMutationCaller:
                 posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][kmer_from_R]
 
                 posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
-                if A==X:
-                    if type(read_BQ) == tuple:
-                        BQ1, BQ2 = read_BQ
-                        read_BQ = max(BQ1,BQ2)
+                #if A==X:
+                if type(read_BQ) == tuple:
+                    BQ1, BQ2 = read_BQ
+                    read_BQ = max(BQ1,BQ2)
+                if X == A:
                     BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
-        
+                elif X == R and i == 0:
+                    BQs[R].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
         
         return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered/(n_filtered+n_nonfiltered)
 
