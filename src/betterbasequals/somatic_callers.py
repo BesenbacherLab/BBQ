@@ -321,9 +321,15 @@ class SomaticMutationCaller:
                     NM_alt.sort()
                     NM_ref.sort()
                     median_NM_alt = NM_alt[len(NM_alt)//2]
-                    median_NM_ref = NM_ref[len(NM_ref)//2]
                     min_NM_alt = min(NM_alt)
-                    min_NM_ref = min(NM_ref)
+
+                    if len(NM_ref)>0:
+                        median_NM_ref = NM_ref[len(NM_ref)//2]
+                        min_NM_ref = min(NM_ref)
+                    else:
+                        median_NM_ref = 0
+                        min_NM_ref = 0
+
                     frac_indel = sum(has_indel)/len(has_indel)
                     frac_clip = sum(has_clip)/len(has_clip)
 
