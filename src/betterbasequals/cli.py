@@ -127,6 +127,8 @@ def get_parser():
     call_parent.add_argument('--mean_type', type=str,
         choices=['arithmetric', 'geometric'], default="geometric",
         help="How to calculate the mean error probabilty of two matching overlapping alleles")
+    call_parent.add_argument('--max_NM_diff', type=int, default=1,
+        help="Maximum allowed difference in median number of mismatches for reads with alt alleles compared to reads with ref alleles")
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -421,6 +423,7 @@ def run_call(opts, kmer_papas):
             opts.pop_vcf,
             opts.min_enddist,
             opts.max_mismatch,
+            opts.max_NM_diff,
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()

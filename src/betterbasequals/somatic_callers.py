@@ -103,6 +103,7 @@ class SomaticMutationCaller:
         pop_vcf = None,
         min_enddist = 6,
         max_mismatch = 2,
+        max_NM_diff = 1,
         filter_mapq = 20,
         min_base_qual_filter=20, 
         min_depth=1, 
@@ -137,6 +138,7 @@ class SomaticMutationCaller:
 
         self.min_enddist = min_enddist
         self.max_mismatch = max_mismatch
+        self.max_NM_diff = max_NM_diff
         self.mapq = mapq
         self.min_base_qual = min_base_qual
         self.filter_mapq = filter_mapq
@@ -329,6 +331,12 @@ class SomaticMutationCaller:
                     else:
                         median_NM_ref = 0
                         min_NM_ref = 0
+                    
+                    if median_NM_alt - median_NM_ref > self.max_NM_diff:
+                        if self.filter_variants:
+                            continue
+                        else:
+                            F_list.append("manyAltMismatches")
 
                     frac_indel = sum(has_indel)/len(has_indel)
                     frac_clip = sum(has_clip)/len(has_clip)
