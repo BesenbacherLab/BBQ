@@ -459,7 +459,7 @@ class SomaticMutationCaller:
                     else:
                         o_read_BQ = events[X][fragment_id][0]
                         if o_read_BQ < read_BQ:
-                            events[A][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
+                            events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
 
                 else: # Mismatch
                     #if not no_update:
