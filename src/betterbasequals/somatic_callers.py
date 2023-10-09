@@ -272,7 +272,12 @@ class SomaticMutationCaller:
 
                 refMQs = [MQ for x,y,MQ in base_probs[A] if x>y]
                 refMQs.sort()
-                ref_medianMQ=refMQs[len(refMQs)//2]
+                
+                if len(refMQs)>0:
+                    ref_medianMQ=refMQs[len(refMQs)//2]
+                else:
+                    continue
+                    ref_medianMQ=0
 
                 AF = None
                 if self.method == 'LR':
