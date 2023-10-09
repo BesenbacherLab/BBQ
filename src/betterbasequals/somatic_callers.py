@@ -457,7 +457,7 @@ class SomaticMutationCaller:
                     if fragment_id not in events[X]:
                         events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
                     else:
-                        o_read_BQ = events[X][fragment_id][1]
+                        o_read_BQ = events[X][fragment_id][0]
                         if o_read_BQ < read_BQ:
                             events[A][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
 
@@ -501,7 +501,7 @@ class SomaticMutationCaller:
             if frag_id not in events[X]:
                 events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))
             else:
-                o_read_BQ = events[X][frag_id][1]
+                o_read_BQ = events[X][frag_id][0]
                 if o_read_BQ < read.base_qual:
                     events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))                        
 
