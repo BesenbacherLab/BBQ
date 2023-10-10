@@ -27,8 +27,8 @@ def get_LR(base_probs):
 def get_maxLR_with_MQ(base_probs):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
-    LL_with_alt = sum(math.log((1-phred2p(p_map_error))*max(phred2p(p_a2x),phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs)
-    LL_no_alt = sum(math.log((1-phred2p(p_map_error))*phred2p(p_r2x) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs)
+    LL_with_alt = sum(math.log((1-phred2p(p_map_error))*max(phred2p(p_a2x),phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs if p_r2x > p_a2x)
+    LL_no_alt = sum(math.log((1-phred2p(p_map_error))*phred2p(p_r2x) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs if p_r2x > p_a2x)
 
     LR = LL_with_alt - LL_no_alt
     return LR
