@@ -248,7 +248,7 @@ class SomaticMutationCaller:
         elif self.method == 'sum':
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
-        elif self.method in ['LR','LR_with_MQ', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior']:
+        elif self.method in ['LR','LR_with_MQ', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior', 'maxLR_with_MQ']:
             base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, filtered_frac = \
                 self.get_alleles_w_probabities_update(pileupcolumn, ref, kmer)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
