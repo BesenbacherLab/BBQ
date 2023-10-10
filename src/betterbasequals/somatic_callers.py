@@ -314,6 +314,13 @@ class SomaticMutationCaller:
                         else:
                             F_list.append("lowBQ")
 
+                    if min(n_pos[A], n_neg[A]) == 0 and max(n_pos[A], n_neg[A])>4:
+                        if self.filter_variants:
+                            continue
+                        else:
+                            F_list.append("StrandBias")
+
+
                     enddist = [x[2] for x in BQs[A]]
                     enddist_str = str(enddist)
                     enddist.sort()
@@ -355,6 +362,8 @@ class SomaticMutationCaller:
 
                     n37_other = sum(x[0]==37 for alt in 'ACGT' for x in BQs[alt] if alt not in [ref,A])
                     #n37_other_nf = sum(x[0]==37 for alt in 'ACGT' for x in no_filter_BQs[alt] if alt not in [ref,A])
+
+
 
                     n_calls += 1
                     if len(F_list) == 0:
