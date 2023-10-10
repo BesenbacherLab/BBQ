@@ -296,7 +296,7 @@ class SomaticMutationCaller:
                 elif self.method == 'LR_with_MQ':
                     QUAL, AF = get_LR_with_MQ(base_probs[A])
                 elif self.method == 'maxLR_with_MQ':
-                    QUAL, AF = get_maxLR_with_MQ(base_probs[A])
+                    QUAL = get_maxLR_with_MQ(base_probs[A])
                 elif self.method == 'BF':
                     QUAL = get_BF(base_probs[A])
                 elif self.method == 'BF_with_MQ':
