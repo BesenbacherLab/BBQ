@@ -23,6 +23,17 @@ def get_LR(base_probs):
     LR = - res.fun + p_data_given_mut(0)
     return LR, alpha
 
+
+def get_maxLR_with_MQ(base_probs):
+    #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
+
+    LL_with_alt = sum(math.log((1-phred2p(p_map_error))*max(phred2p(p_a2x),phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs)
+    LL_no_alt = sum(math.log((1-phred2p(p_map_error))*phred2p(p_r2x) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs)
+
+    LR = LL_with_alt - LL_no_alt
+    return LR
+
+
 def get_LR_with_MQ(base_probs):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
@@ -284,6 +295,8 @@ class SomaticMutationCaller:
                     QUAL, AF = get_LR(base_probs[A])
                 elif self.method == 'LR_with_MQ':
                     QUAL, AF = get_LR_with_MQ(base_probs[A])
+                elif self.method == 'maxLR_with_MQ':
+                    QUAL, AF = get_maxLR_with_MQ(base_probs[A])
                 elif self.method == 'BF':
                     QUAL = get_BF(base_probs[A])
                 elif self.method == 'BF_with_MQ':

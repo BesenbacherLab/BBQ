@@ -110,7 +110,7 @@ def get_parser():
     call_parent.add_argument('--outfile', type=argparse.FileType('w'), default=sys.stdout,
         help="output file")
     call_parent.add_argument('--method', type=str,
-        choices=['LR', 'LR_with_MQ', 'poisson', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior'], default="LR",
+        choices=['LR', 'LR_with_MQ', 'poisson', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior', 'maxLR_with_MQ'], default="LR",
         help="Method used to calculate variant quality scores")
     call_parent.add_argument('--cutoff', type=float, default=None, metavar='Q',
         help="Only print variants with quality above Q.")
