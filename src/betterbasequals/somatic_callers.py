@@ -325,7 +325,7 @@ class SomaticMutationCaller:
                     b = n_nonfiltered[A]
                     c = n_filtered[ref]
                     d = n_nonfiltered[ref]
-                    if (a*d)/(b*c) <= 1:
+                    if a*d <= b*c:
                         filter_allele_pval = 1.0
                     else:
                         filter_allele_pval = scipy.stats.fisher_exact([[a,b],[c,d]], alternative='greater')[1]
