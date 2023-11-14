@@ -249,7 +249,7 @@ class SomaticMutationCaller:
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
         elif self.method in ['LR','LR_with_MQ', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior', 'maxLR_with_MQ']:
-            base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, filtered_frac = \
+            base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered = \
                 self.get_alleles_w_probabities_update(pileupcolumn, ref, kmer)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
@@ -272,8 +272,9 @@ class SomaticMutationCaller:
                 if len(altMQs) == 0:
                     continue
                 altMQs.sort()
-                medianMQ=altMQs[len(altMQs)//2]
+                medianMQ = altMQs[len(altMQs)//2]
                 
+                N_total = sum(n_filtered.values()) + sum(n_nonfiltered.values())
 
                 if medianMQ < 30:
                     if self.filter_variants:
@@ -285,10 +286,10 @@ class SomaticMutationCaller:
                 refMQs.sort()
                 
                 if len(refMQs)>0:
-                    ref_medianMQ=refMQs[len(refMQs)//2]
+                    ref_medianMQ = refMQs[len(refMQs)//2]
                 else:
+                    ref_medianMQ = 0
                     continue
-                    ref_medianMQ=0
 
                 AF = None
                 if self.method == 'LR':
@@ -317,9 +318,11 @@ class SomaticMutationCaller:
                     oldBQ = [x[0] for x in BQs[A]]
                     oldBQ.sort()
                     
-                    medianBQ=oldBQ[len(oldBQ)//2]
+                    medianBQ = oldBQ[len(oldBQ)//2]
                     
                     n37 = sum(x[0]==37 for x in BQs[A])
+
+                    filter_allele_table = f'[{n_filtered[A]},{n_nonfiltered[A]},{n_filtered[ref]},{n_nonfiltered[ref]}]'
 
                     if medianBQ < 20:
                         if self.filter_variants:
@@ -392,7 +395,7 @@ class SomaticMutationCaller:
 
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={no_filter_n_mismatch[A]};n_overlap={no_filter_n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};no_filter_n_other={n37_other_nf}{optional_info}', file=self.outfile)
-                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};median_alt_NM={median_NM_alt};median_ref_NM={median_NM_ref};min_alt_NM={min_NM_alt};min_ref_NM={min_NM_ref};quartile_NM_ref={quartile_NM_ref};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};filtered_frac={filtered_frac};ref_medianMQ={ref_medianMQ}{optional_info}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};N_total={N_total};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};median_alt_NM={median_NM_alt};median_ref_NM={median_NM_ref};min_alt_NM={min_NM_alt};min_ref_NM={min_NM_ref};quartile_NM_ref={quartile_NM_ref};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};ref_medianMQ={ref_medianMQ};filter_vs_allele={filter_allele_table}{optional_info}', file=self.outfile)
 
         return n_calls
     
@@ -413,8 +416,8 @@ class SomaticMutationCaller:
         n_neg = Counter()
         events = {'A':{}, 'C':{}, 'G':{}, 'T':{}}
 
-        n_filtered = 0
-        n_nonfiltered = 0
+        n_filtered = Counter()
+        n_nonfiltered = Counter()
 
         observed_BQs = set()
         R = ref
@@ -444,7 +447,7 @@ class SomaticMutationCaller:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
 
-                n_nonfiltered += 1
+                #n_nonfiltered += 1
 
                 # We do not trust mismathces in overlaps so we only add to events list in case of match
                 if read.allel == mem_read.allel:
@@ -460,8 +463,11 @@ class SomaticMutationCaller:
                             reads_mem[read.query_name] = read
                             continue
                         elif (not read.is_good(self.min_enddist, self.max_mismatch)) and (not mem_read.is_good(self.min_enddist, self.max_mismatch)):
-                            n_filtered += 1
+                            #n_filtered += 1
+                            n_filtered[X] += 1
                             continue
+                        else:
+                            n_nonfiltered[X] += 1
 
                     if X != R:
                         seen_alt.add(X)
@@ -518,10 +524,11 @@ class SomaticMutationCaller:
         for read in reads_mem.values():
             X = read.allel
             if self.filter_reads and not read.is_good(self.min_enddist, self.max_mismatch):
-                n_filtered += 1
+                #n_filtered += 1
+                n_filtered[X] += 1
                 continue
-                
-            n_nonfiltered += 1
+            else:    
+                n_nonfiltered[X] += 1
 
             if X != R:
                 seen_alt.add(X)
@@ -540,7 +547,7 @@ class SomaticMutationCaller:
                     events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))                        
 
         if len(seen_alt) == 0:
-            return {}, {}, n_mismatch, n_double, n_pos, n_neg, 0
+            return {}, {}, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered
 
 
         new_mut_probs = defaultdict(dict)
@@ -612,6 +619,7 @@ class SomaticMutationCaller:
             BQs[R].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
         
 
-        return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered/(n_filtered+n_nonfiltered)
+
+        return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered
 
 
