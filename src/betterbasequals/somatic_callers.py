@@ -321,8 +321,21 @@ class SomaticMutationCaller:
                     medianBQ = oldBQ[len(oldBQ)//2]
                     
                     n37 = sum(x[0]==37 for x in BQs[A])
+                    a = n_filtered[A]
+                    b = n_nonfiltered[A]
+                    c = n_filtered[ref]
+                    d = n_nonfiltered[ref]
+                    if (a*d)/(b*c) <= 1:
+                        filter_allele_pval = 1.0
+                    else:
+                        filter_allele_pval = scipy.stats.fisher_exact([[a,b],[c,d]], alternative='greater')[1]
+                    filter_allele_table = f'[{a},{b},{c},{d}]'
 
-                    filter_allele_table = f'[{n_filtered[A]},{n_nonfiltered[A]},{n_filtered[ref]},{n_nonfiltered[ref]}]'
+                    if filter_allele_pval < 0.05:
+                        if self.filter_variants:
+                            continue
+                        else:
+                            F_list.append("FilterBias")
 
                     if medianBQ < 20:
                         if self.filter_variants:
@@ -395,7 +408,7 @@ class SomaticMutationCaller:
 
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={no_filter_n_mismatch[A]};n_overlap={no_filter_n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};no_filter_n_other={n37_other_nf}{optional_info}', file=self.outfile)
-                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};N_total={N_total};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};median_alt_NM={median_NM_alt};median_ref_NM={median_NM_ref};min_alt_NM={min_NM_alt};min_ref_NM={min_NM_ref};quartile_NM_ref={quartile_NM_ref};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};ref_medianMQ={ref_medianMQ};filter_vs_allele={filter_allele_table}{optional_info}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};N_total={N_total};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};median_alt_NM={median_NM_alt};median_ref_NM={median_NM_ref};min_alt_NM={min_NM_alt};min_ref_NM={min_NM_ref};quartile_NM_ref={quartile_NM_ref};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};ref_medianMQ={ref_medianMQ};filter_vs_allele={filter_allele_table};filter_allele_pval={filter_allele_pval:.3g}{optional_info}', file=self.outfile)
 
         return n_calls
     
