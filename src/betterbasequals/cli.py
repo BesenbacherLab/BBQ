@@ -8,6 +8,7 @@ from betterbasequals.somatic_callers import SomaticMutationCaller
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from betterbasequals.kmerpapa_utils import get_kmerpapa
+from betterbasequals.filter_calls import BBQFilter
 from math import sqrt
 
 def get_parser():
@@ -203,6 +204,18 @@ def get_parser():
         help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
         choices=["bad_vs_good", "bad_vs_no"])
     test_kmerpapa_parser.add_argument('--same_good', action='store_true')
+
+    filter_calls_parser = subparsers.add_parser('filter_calls', 
+        description = 'Filter PASS calls based on coverage quantiles',
+        help = 'Filter PASS calls based on coverage quantiles')
+    filter_calls_parser.add_argument('--vcf_file', required=True, type=argparse.FileType('r'),
+        help='input VCF file')
+    filter_calls_parser.add_argument('--outfile', required=True, type=argparse.FileType('w'),
+        help='output VCF file') 
+    filter_calls_parser.add_argument('--lower_q', type=float, default=0.05,
+        help='Lower quantile, PASS calls with coverage below this value will be filtered out') 
+    filter_calls_parser.add_argument('--upper_q', type=float, default=0.95,
+        help='Upper quantile, PASS calls with coverage above this value will be filtered out') 
     return parser
 
 
@@ -472,6 +485,23 @@ def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
                 print(bqual, mtype, pat, get_phred(kmer_papas[bqual][mtype][pat]), n_bad, n_good, phred)
 
 
+def run_calls_filter(opts):
+    if opts.verbosity > 0:
+        eprint(f'Filtering PASS calls based on {opts.lower_q*100}% and {opts.upper_q*100}% coverage quantiles.')
+
+    filter = \
+        BBQFilter(
+            opts.vcf_file, 
+            opts.outfile, 
+            opts.lower_q,
+            opts.upper_q
+            )
+    n_filtered = filter.filter_BBQ()
+    
+    if opts.verbosity > 0:
+        eprint(f"Removed {n_filtered} PASS calls.")
+
+
 def main(args = None):
     """
     Run the main program.
@@ -494,7 +524,7 @@ def main(args = None):
         parser.print_help(sys.stderr)
         return 1
 
-    if not opts.command in ['train_only', 'validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
+    if not opts.command in ['train_only', 'validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa', 'filter_calls']:
         event_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command in ['train_only', 'test_kmerpapa']:
         event_kmers = read_kmers(opts)
@@ -502,10 +532,12 @@ def main(args = None):
     if opts.command == 'count':
         return 0
 
-    if not opts.command in ['validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
+    if not opts.command in ['validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa', 'filter_calls']:
         kmer_papas = run_get_kmerpapas(opts, event_kmers)
     elif opts.command in "test_kmerpapa":
         kmer_papas = read_kmer_papas_for_test(opts)
+    elif opts.command in "filter_calls":
+        pass
     else:
         eprint("Reading kmer pattern partitions")
         kmer_papas = read_kmer_papas(opts)
@@ -523,6 +555,8 @@ def main(args = None):
         run_adjust(opts, kmer_papas)
     #elif opts.command == 'test_kmerpapa':
     #    run_test_kmerpapas(opts, kmer_papas, event_kmers)
+    elif opts.command == 'filter_calls':
+        run_calls_filter(opts)
     else:
         eprint("Unknown command: {opts.command}")
         return 1
