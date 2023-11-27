@@ -159,8 +159,6 @@ class SomaticMutationCaller:
         self.radius = radius
         self.prefix = prefix
         self.filter_variants = False
-        self.filter_reads = True
-
 
         #TODO: filter_depth variable should be set based on average coverage in filter file.
         self.min_filter_depth = 10
@@ -185,7 +183,7 @@ class SomaticMutationCaller:
             stop = stop,
             truncate = True,
             max_depth = 1000000,
-            min_mapping_quality = self.mapq,
+            min_mapping_quality = 0, #self.mapq,
             ignore_overlaps = False,
             flag_require = 0,  # No requirements
             flag_filter = 3840,
@@ -392,8 +390,6 @@ class SomaticMutationCaller:
                     n37_other = sum(x[0]==37 for alt in 'ACGT' for x in BQs[alt] if alt not in [ref,A])
                     #n37_other_nf = sum(x[0]==37 for alt in 'ACGT' for x in no_filter_BQs[alt] if alt not in [ref,A])
 
-
-
                     n_calls += 1
                     if len(F_list) == 0:
                         FILTER = "PASS"
@@ -435,52 +431,33 @@ class SomaticMutationCaller:
         observed_BQs = set()
         R = ref
         for pileup_read in pileupcolumn.pileups:
-            # test for deletion at pileup
-            if pileup_read.is_del or pileup_read.is_refskip:
-                continue
-            #TODO: should consider what the right solution is if there is deletion at overlap
-
+           
             # fetch read information
             read = Read(pileup_read)
-
-            #if filter_reads and not read.is_good():
-            #    continue
-
-            # test if read is okay
-            if (
-                read.allel not in "ATGC"
-                or read.start is None
-                or read.end is None
-            ):
-                continue
-            
 
             # Look for read partner
             if read.query_name in reads_mem:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
 
-                #n_nonfiltered += 1
-
                 # We do not trust mismathces in overlaps so we only add to events list in case of match
                 if read.allel == mem_read.allel:
                     X = read.allel
 
-                    if self.filter_reads:
-                        if (not read.is_good(self.min_enddist, self.max_mismatch)) and mem_read.is_good(self.min_enddist, self.max_mismatch):
-                            #considder mem_read single read.
-                            reads_mem[read.query_name] = mem_read
-                            continue
-                        elif (not mem_read.is_good(self.min_enddist, self.max_mismatch)) and read.is_good(self.min_enddist, self.max_mismatch):
-                            #considder read single read.
-                            reads_mem[read.query_name] = read
-                            continue
-                        elif (not read.is_good(self.min_enddist, self.max_mismatch)) and (not mem_read.is_good(self.min_enddist, self.max_mismatch)):
-                            #n_filtered += 1
-                            n_filtered[X] += 1
-                            continue
-                        else:
-                            n_nonfiltered[X] += 1
+                    if (not read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) and mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
+                        #considder mem_read single read.
+                        reads_mem[read.query_name] = mem_read
+                        continue
+                    elif (not mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) and read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
+                        #considder read single read.
+                        reads_mem[read.query_name] = read
+                        continue
+                    elif (not read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) and (not mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq)):
+                        #n_filtered += 1
+                        n_filtered[X] += 1
+                        continue
+                    else:
+                        n_nonfiltered[X] += 1
 
                     if X != R:
                         seen_alt.add(X)
@@ -536,8 +513,7 @@ class SomaticMutationCaller:
         # Handle reads without partner (ie. no overlap)
         for read in reads_mem.values():
             X = read.allel
-            if self.filter_reads and not read.is_good(self.min_enddist, self.max_mismatch):
-                #n_filtered += 1
+            if not read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
                 n_filtered[X] += 1
                 continue
             else:    
@@ -631,7 +607,6 @@ class SomaticMutationCaller:
                 read_BQ = max(BQ1,BQ2)
             BQs[R].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
         
-
 
         return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered
 

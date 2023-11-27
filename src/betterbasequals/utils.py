@@ -106,7 +106,10 @@ class Read:
         # set attributes
         self.start = pileup_read.alignment.reference_start
         self.end = pileup_read.alignment.reference_end
-        self.allel = pileup_read.alignment.query_sequence[self.pos]
+        if pileup_read.is_del or pileup_read.is_refskip:
+            self.allel ='-'
+        else:
+            self.allel = pileup_read.alignment.query_sequence[self.pos]
         self.is_reverse = pileup_read.alignment.is_reverse
         self.base_qual = pileup_read.alignment.query_qualities[self.pos]
         self.query_name = pileup_read.alignment.query_name
@@ -123,11 +126,13 @@ class Read:
         self.NM = cigar_stats[10]
         #print(pileup_read.alignment.get_cigar_stats())
     
-    def is_good(self, min_enddist=6, max_mismatch = 2):
+    def is_good(self, min_enddist=6, max_mismatch = 2, min_mapq = 50):
         return (self.NM <= max_mismatch and
                 not self.has_indel and
                 not self.has_clip and
-                self.enddist >= min_enddist)
+                self.enddist >= min_enddist and
+                self.mapq >= min_mapq and
+                self.allel in ['A', 'C', 'G', 'T'])
 
 
 class ReadPair:
