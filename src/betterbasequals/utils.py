@@ -106,18 +106,21 @@ class Read:
         # set attributes
         self.start = pileup_read.alignment.reference_start
         self.end = pileup_read.alignment.reference_end
+
         if pileup_read.is_del or pileup_read.is_refskip:
             self.allel ='-'
+            self.base_qual = 0
         else:
             self.allel = pileup_read.alignment.query_sequence[self.pos]
+            self.base_qual = pileup_read.alignment.query_qualities[self.pos]
+            self.enddist = min(self.pos, len(pileup_read.alignment.query_sequence)-self.pos)
+
         self.is_reverse = pileup_read.alignment.is_reverse
-        self.base_qual = pileup_read.alignment.query_qualities[self.pos]
         self.query_name = pileup_read.alignment.query_name
         self.length = abs(pileup_read.alignment.template_length)
         self.isR1 = pileup_read.alignment.is_read1
         self.mapq = pileup_read.alignment.mapping_quality
         #self.NH = pileup_read.alignment.get_tag("NH")
-        self.enddist = min(self.pos, len(pileup_read.alignment.query_sequence)-self.pos)
         # Process cigar stats
         cigar_stats = pileup_read.alignment.get_cigar_stats()[0]
         self.has_indel = sum(cigar_stats[1:4]) != 0
