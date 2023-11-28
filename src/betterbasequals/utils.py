@@ -129,6 +129,16 @@ class Read:
                 not self.has_clip and
                 self.enddist >= min_enddist)
 
+def cut_cigar_NM(cigar_tups, read_length, enddist):
+    seen = 0
+    D = Counter()
+    for operation, count in cigar_tups:
+        ignore_left = max(0, enddist - seen)
+        ignore_right = max(0, (seen+count - (read_length - enddist)))
+        seen += count
+        D[operation] += max(0, count - ignore_left - ignore_right)
+        print(operation, count, ignore_left, ignore_right)
+    return D, seen
 
 class ReadPair:
     def __init__(self, read1, read2):
