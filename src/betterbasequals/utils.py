@@ -108,7 +108,7 @@ class Read:
         self.end = pileup_read.alignment.reference_end
 
         if pileup_read.is_del or pileup_read.is_refskip:
-            self.allel ='-'
+            self.allel = '-'
             self.base_qual = 0
         else:
             self.allel = pileup_read.alignment.query_sequence[self.pos]

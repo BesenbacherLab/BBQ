@@ -335,7 +335,7 @@ class SomaticMutationCaller:
                         else:
                             F_list.append("FilterBias")
 
-                    indel_reads = n_nonfiltered['-']
+                    indel_reads = n_filtered['-']
 
                     if medianBQ < 20:
                         if self.filter_variants:
