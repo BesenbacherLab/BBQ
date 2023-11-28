@@ -170,24 +170,24 @@ class MutationCounterWFilter:
 
         for pileup_read in pileupcolumn.pileups:
             # test for deletion at pileup
-            if pileup_read.is_del or pileup_read.is_refskip:
-                continue
+            #if pileup_read.is_del or pileup_read.is_refskip:
+            #    continue
             coverage += 1
             #TODO: should consider what the right solution is if there is deletion at overlap
 
             # fetch read information
             read = Read(pileup_read)
-            if not read.is_good(self.min_enddist, self.max_mismatch):
+            if not read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
                 continue
             
-            # test if read is okay
-            if (
-                read.allel not in "ATGC"
-                or read.start is None
-                or read.end is None
-                #or read.NH != 1
-            ):
-                continue
+            # # test if read is okay
+            # if (
+            #     read.allel not in "ATGC"
+            #     or read.start is None
+            #     or read.end is None
+            #     #or read.NH != 1
+            # ):
+            #     continue
 
             if read.base_qual > 30:
                 n_alleles[read.allel] += 1
@@ -200,7 +200,6 @@ class MutationCounterWFilter:
                 if read.allel == mem_read.allel:
                     event_list.append(('good', read.allel, read.base_qual))
                     event_list.append(('good', mem_read.allel, mem_read.base_qual))
-                    
                     event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
 
                     if max(read.base_qual, mem_read.base_qual) > 30:
