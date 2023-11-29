@@ -1,6 +1,6 @@
 import py2bit
 from scipy.optimize import minimize_scalar
-from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read, change_mtypes, SW_type
+from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read, change_mtypes, SW_type, SortedBed
 from collections import Counter, defaultdict
 import scipy.stats
 import math
@@ -116,11 +116,12 @@ class SomaticMutationCaller:
         max_mismatch = 2,
         max_NM_diff = 1,
         filter_mapq = 20,
-        min_base_qual_filter=20, 
-        min_depth=1, 
-        max_depth=1000000,
-        radius=3, 
-        prefix="", 
+        min_base_qual_filter = 20, 
+        min_depth = 1, 
+        max_depth = 1000000,
+        radius = 3, 
+        prefix = "",
+        bed_file = None,
     ):
 
         # Open files for reading
@@ -164,6 +165,11 @@ class SomaticMutationCaller:
         self.min_filter_depth = 10
         self.max_filter_depth = 1000000
         self.min_filter_count = min_filter_count
+
+        if not bed_file is None:
+            self.bed = SortedBed(bed_file)
+        else:
+            self.bed = None
                 
 
     def __del__(self):
@@ -223,14 +229,16 @@ class SomaticMutationCaller:
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%100000 == 0:
-            eprint(f"{chrom}:{ref_pos}")            
-        #if not self.bed_query_func(chrom, ref_pos):
-        #    continue
+            eprint(f"{chrom}:{ref_pos}")
+
+        if not self.bed is None and self.bed.query(chrom, ref_pos):
+            return 0
 
         n_calls = 0
 
         if ref_pos-self.radius < 0:
             return 0
+        
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
             return 0

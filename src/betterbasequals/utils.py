@@ -497,3 +497,34 @@ def print_base_probs(base_probs):
         for x in D:
             p_A2X, p_R2X, MQ = x
             print(phred2p(p_A2X),phred2p(p_R2X), D[x], sep = '\t')
+
+class SortedBed:
+    def __init__(self, bedname):
+        self.name = bedname
+        self.f = open(bedname)
+        self.bed_chrom = 'chr0'
+        self.bed_start = -1
+        self.bed_end = -1
+
+    def query(self, chrom, pos):
+        # TODO: check if the input is sorted
+        while self.bed_chrom < chrom or (self.bed_chrom == chrom and self.bed_end <= pos):
+            bedL = self.f.readline().split()
+            if len(bedL) == 0:
+                break
+            if (bedL[0] == self.bed_chrom and
+                ((int(bedL[1])+1) < self.bed_start or
+                 (int(bedL[2])+1) < self.bed_end)):
+                eprint("bed positions not sorted:", self.name)
+                eprint(' '.join(bedL))
+                eprint( self.bed_chrom, self.bed_start, self.bed_end)
+                sys.exit()
+            if bedL[0] < self.bed_chrom:
+                eprint("bed chromosomes not sorted:", self.name)
+                eprint(' '.join(bedL))
+                eprint(self.bed_chrom, self.bed_start, self.bed_end)
+                sys.exit()
+            self.bed_chrom = bedL[0]
+            self.bed_start = int(bedL[1])+1
+            self.bed_end = int(bedL[2])+1
+        return (chrom == self.bed_chrom) and ( self.bed_start <= pos) and (pos < self.bed_end)

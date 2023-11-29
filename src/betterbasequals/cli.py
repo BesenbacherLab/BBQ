@@ -50,8 +50,10 @@ def get_parser():
         help="Ignore bases in the first M or last M positions in the read")
     read_filter_parent.add_argument('--max_mismatch', type=int, default=1, metavar="M",
         help="Ignore alt reads if the read has more than M mismatches to the reference")
-    read_filter_parent.add_argument('--min_MQ', type=int, default=60,
+    read_filter_parent.add_argument('--min_MQ', type=int, default=40,
         help="Minimum base quality to considder")
+    read_filter_parent.add_argument('--exclude_bed', type=str,
+        help='Bed file with regions to exclude. Should be sorted by chrom (alphabetically) then pos (numrically).')
 
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
@@ -65,6 +67,7 @@ def get_parser():
         help="minimum depth in filter_bam_file for a site to be considered as training data")
     count_parent.add_argument('--filter_max_depth', type=int, default=5000,
         help="maximum depth om filter_bam_file at a site to be considered as training data")
+
 
     # args for training models:    
     train_parent = argparse.ArgumentParser(add_help=False)
@@ -230,7 +233,8 @@ def run_get_good_and_bad_w_filter(opts):
             opts.min_MQ,
             radius = opts.radius,
             min_enddist = opts.min_enddist,
-            max_mismatch = opts.max_mismatch)
+            max_mismatch = opts.max_mismatch,
+            bed_file = opts.exclude_bed)
     
     if opts.chrom is None:
         event_kmers = counter.count_mutations_all_chroms()
@@ -437,6 +441,7 @@ def run_call(opts, kmer_papas):
             opts.min_enddist,
             opts.max_mismatch,
             opts.max_NM_diff,
+            bed_file = opts.exclude_bed,
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()

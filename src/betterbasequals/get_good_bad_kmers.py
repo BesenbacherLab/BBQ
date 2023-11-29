@@ -2,7 +2,7 @@ import pysam
 import py2bit
 import os
 from collections import Counter
-from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, eprint, open_bam_w_index
+from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, eprint, open_bam_w_index, SortedBed
 
 def get_mut_type(ref, alt):
     if ref in ['T', 'G']:
@@ -37,6 +37,7 @@ class MutationCounterWFilter:
         max_filter_depth = 100,
         min_enddist = 6,
         max_mismatch = 2,
+        bed_file = None,
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
@@ -67,6 +68,10 @@ class MutationCounterWFilter:
         self.max_filter_depth = max_filter_depth
         self.min_enddist = min_enddist
         self.max_mismatch = max_mismatch
+        if not bed_file is None:
+            self.bed = SortedBed(bed_file)
+        else:
+            self.bed = None
 
     def __del__(self):
         self.tb.close()
@@ -138,7 +143,10 @@ class MutationCounterWFilter:
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
-            eprint(f"{chrom}:{ref_pos}")            
+            eprint(f"{chrom}:{ref_pos}")    
+
+        if not self.bed is None and self.bed.query(chrom, ref_pos):
+            return
         #if not self.bed_query_func(chrom, ref_pos):
         #    continue
         if ref_pos-self.radius < 0:
