@@ -616,6 +616,8 @@ class SomaticMutationCaller:
             if type(read_BQ) == tuple:
                 BQ1, BQ2 = read_BQ
                 read_BQ = max(BQ1,BQ2)
+                str_BQ = f'{BQ1}/{BQ2}'
+            
             BQs[R].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
         
 
