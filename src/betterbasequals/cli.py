@@ -211,9 +211,9 @@ def get_parser():
     filter_calls_parser = subparsers.add_parser('filter_calls', 
         description = 'Filter PASS calls based on coverage quantiles',
         help = 'Filter PASS calls based on coverage quantiles')
-    filter_calls_parser.add_argument('--vcf_file', required=True, type=argparse.FileType('r'),
+    filter_calls_parser.add_argument('--vcf_file', required=True,
         help='input VCF file')
-    filter_calls_parser.add_argument('--outfile', required=True, type=argparse.FileType('w'),
+    filter_calls_parser.add_argument('--outfile', required=True,
         help='output VCF file') 
     filter_calls_parser.add_argument('--lower_q', type=float, default=0.05,
         help='Lower quantile, PASS calls with coverage below this value will be filtered out') 

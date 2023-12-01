@@ -1,7 +1,6 @@
-from collections import defaultdict
 from betterbasequals.utils import eprint
+from operator import itemgetter
 import numpy as np
-import pandas as pd
 
 
 class BBQFilter:
@@ -13,53 +12,63 @@ class BBQFilter:
         cutoff_upper
     ):
 
-        self.calls =  pd.read_csv(vcf_file, sep = "\t", header = None, names = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'])
+        self.vcf = vcf_file
         self.cutoff_lower = cutoff_lower
         self.cutoff_upper = cutoff_upper
         self.outfile = outfile
 
 
     def filter_BBQ(self):
-        n_var = self.calls.shape[0]
-        eprint(f'Total number of calls before filtering: {n_var}')
-        eprint(f'Number of PASS calls before filtering: {len(self.calls[self.calls["FILTER"]=="PASS"])}')
+        cov_list = []
+        cov_total_list = []
+        calls = open(self.vcf, 'r')
+        n_pass = 0
 
-        # separate N and N_total info columns
-        info_strings = '{"' + self.calls.INFO.str.split(';').str.join('","').str.replace('=','":"').str.replace("\"\",", "") + '"}' 
-        info_df = pd.json_normalize(info_strings.apply(eval))
-        calls_info = pd.concat([self.calls.reset_index(drop=True), info_df[["N", "N_total"]]], axis=1)
-        calls_info['N'] = calls_info['N'].astype('int')
-        calls_info['N_total'] = calls_info['N_total'].astype('int')
+        # create a list of PASS variant coverages
+        for line in calls:
+            if line.split("\t")[6] == "PASS":
+                n_pass += 1
+                cov = itemgetter(1, 4)(line.split("\t")[7].split(";"))
+                cov_list.append(int(cov[0].split("=")[1]))
+                cov_total_list.append(int(cov[1].split("=")[1]))
+        calls.close()
+        eprint(f'Number of PASS calls before filtering: {n_pass}')
+        
+        cov_arr = np.array(cov_list)
+        cov_total_arr = np.array(cov_total_list)
 
         # filtered coverage quantiles of PASS variants
-        N = calls_info["N"][calls_info['FILTER'] == "PASS"]
-        N_lower, N_upper = self.quantiles(N)
-        
+        cov_q_l = np.quantile(cov_arr, self.cutoff_lower)
+        cov_q_u = np.quantile(cov_arr, self.cutoff_upper)
+
         # total coverage quantiles of PASS variants
-        N_total = calls_info["N_total"][calls_info['FILTER'] == "PASS"]
-        N_t_lower, N_t_upper = self.quantiles(N_total)
+        cov_total_q_l = np.quantile(cov_total_arr, self.cutoff_lower)
+        cov_total_q_u = np.quantile(cov_total_arr, self.cutoff_upper)
 
-        # filter PASS variants based on coverage quantiles
-        filtered_calls = calls_info[["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]][(calls_info['FILTER'] != "PASS") | ((calls_info['N'].between(N_lower, N_upper)) & (calls_info['N_total'].between(N_t_lower, N_t_upper)) & (calls_info['FILTER'] == "PASS"))]
-        filtered_calls = filtered_calls.sort_values(['CHROM', 'POS'], ascending=[True, True])
+        # filter PASS variants based on coverage quantiles 
+        pass_count = 0
+        n_filtered = 0
+        n_pass = 0
+        with open(self.vcf, 'r') as calls, open(self.outfile, 'w') as filtered_calls:
+            for line in calls:
+                if line.split("\t")[6] == "PASS":
+                    cov = cov_list[pass_count]
+                    cov_total = cov_total_list[pass_count]
+                    pass_count += 1
+                    if cov_q_l <= cov <= cov_q_u:
+                        if cov_total_q_l <= cov_total <= cov_total_q_u:
+                            n_pass += 1
+                            filtered_calls.write(line)
+                        else: 
+                            n_filtered += 1
+                    else: 
+                        n_filtered += 1
+                else: 
+                    filtered_calls.write(line)
 
-        # write output
-        filtered_calls.to_csv(self.outfile,  sep='\t', header = False, index = False)
+        eprint(f'Number of PASS calls after filtering: {n_pass}')
         
-        n_filtered = n_var - filtered_calls.shape[0]
-
-        eprint(f'Total number of calls after filtering: {filtered_calls.shape[0]}')
-        eprint(f'Number of PASS calls after filtering: {len(filtered_calls[filtered_calls["FILTER"]=="PASS"])}')
-    
         return n_filtered
-
-    def quantiles(self, cov_list):
-        # calculate and return quantiles of pandas series
-        quantiles = cov_list.quantile([self.cutoff_lower, self.cutoff_upper])
-        lower = quantiles[self.cutoff_lower]
-        upper = quantiles[self.cutoff_upper]
-        
-        return lower, upper
                 
 
 
