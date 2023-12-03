@@ -58,13 +58,13 @@ class BBQFilter:
                     if cov_q_l <= cov <= cov_q_u:
                         if cov_total_q_l <= cov_total <= cov_total_q_u:
                             n_pass += 1
-                            outfile.write(line)
+                            self.outfile.write(line)
                         else: 
                             n_filtered += 1
                     else: 
                         n_filtered += 1
                 else: 
-                    outfile.write(line)
+                    self.outfile.write(line)
 
         eprint(f'Number of PASS calls after filtering: {n_pass}')
         
