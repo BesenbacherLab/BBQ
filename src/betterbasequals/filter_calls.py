@@ -49,7 +49,7 @@ class BBQFilter:
         pass_count = 0
         n_filtered = 0
         n_pass = 0
-        with open(self.vcf, 'r') as calls, open(self.outfile, 'w') as filtered_calls:
+        with open(self.vcf, 'r') as calls:
             for line in calls:
                 if line.split("\t")[6] == "PASS":
                     cov = cov_list[pass_count]
@@ -58,13 +58,13 @@ class BBQFilter:
                     if cov_q_l <= cov <= cov_q_u:
                         if cov_total_q_l <= cov_total <= cov_total_q_u:
                             n_pass += 1
-                            filtered_calls.write(line)
+                            outfile.write(line)
                         else: 
                             n_filtered += 1
                     else: 
                         n_filtered += 1
                 else: 
-                    filtered_calls.write(line)
+                    outfile.write(line)
 
         eprint(f'Number of PASS calls after filtering: {n_pass}')
         
