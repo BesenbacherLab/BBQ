@@ -9,7 +9,7 @@ def list_vals(x):
 counter = Counter()
 
 for line in sys.stdin:
-    L = line.split('\t')
+    L = line.strip().split('\t')
     
     fromA = L[3]
     toA = L[4]
@@ -23,12 +23,14 @@ for line in sys.stdin:
     if L[6] == 'PASS' or L[6] == 'lowBQ':
         D = dict(x.split('=') for x in  L[7].strip().split(';'))
         oldBQs = list_vals(D['oldBQ'])
-        newBQs = list_vals(D['newBQ'])
+        newBQs = [str(int(float(x))) for x in list_vals(D['newBQ'])]
         assert(len(oldBQs)==len(newBQs))
         for i in range(len(oldBQs)):
             oldBQ = oldBQs[i]
-            if ',' in oldBQ:
-                max_oldBQ = max(int(x) for x in oldBQ[1:-1].split(','))
+            if '/' in oldBQ:
+                max_oldBQ = str(max(int(x) for x in oldBQ.split('/')))
+            else:
+                max_oldBQ = oldBQ
             counter[(muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'])] += 1
 
 columns = [
