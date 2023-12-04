@@ -280,6 +280,7 @@ def run_get_kmerpapas(opts, event_kmers):
     for bqual in BQs:
         BQ_pair = f'({bqual},{bqual})'
         kmer_papas[BQ_pair] = {}
+        kmer_papas[bqual] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             contextD = {}
             ref = mtype[0]
@@ -302,7 +303,7 @@ def run_get_kmerpapas(opts, event_kmers):
                         n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
                         n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
                 contextD[kmer] = (n_errors, n_not_error)
-                
+
             kpp = get_kmerpapa(super_pattern, contextD, opts)
             if opts.estimated == "single":
                 estBQ = bqual
