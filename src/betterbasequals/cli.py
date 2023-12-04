@@ -301,8 +301,8 @@ def run_get_kmerpapas(opts, event_kmers):
                     if not opts.same_good:
                         n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
                         n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
-
-            contextD[kmer] = (n_errors, n_not_error)
+                contextD[kmer] = (n_errors, n_not_error)
+                
             kpp = get_kmerpapa(super_pattern, contextD, opts)
             if opts.estimated == "single":
                 estBQ = bqual
