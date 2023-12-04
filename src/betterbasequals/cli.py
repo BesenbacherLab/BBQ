@@ -78,6 +78,7 @@ def get_parser():
         help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
         choices=["bad_vs_good", "bad_vs_no"])
     train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
+    train_parent.add_argument("--output_file_EQ", type=argparse.FileType('w'))
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
         help='Number of folds to use when fitting hyperparameters in kmerpapa')
     train_parent.add_argument('-i', '--iterations', type=int, default=1, metavar='i',
@@ -85,6 +86,9 @@ def get_parser():
     train_parent.add_argument('--seed', type=int,
         help='seed for numpy.random')
     train_parent.add_argument('--same_good', action='store_true')
+    train_parent.add_argument('--kmer_version', type=int, default = 1)
+    train_parent.add_argument('--estimated', type=str, default = 'double',
+                              choices = ['single', 'double'])
     train_parent.add_argument(
         '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10],
         help='Different pseudo count (alpha) values to test using cross validation')
@@ -285,38 +289,34 @@ def run_get_kmerpapas(opts, event_kmers):
             other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
             eprint(f'Handling base_qual: {BQ_pair}, muttype: {mtype}')
             for kmer in matches(super_pattern):
-                n_errors = event_kmers[('bad', bqual, mtype, kmer)]
-                n_not_error = event_kmers[('good', bqual, notype, kmer)]
-                if not opts.same_good:
-                    n_not_error += event_kmers[('bad', bqual, other_type1, kmer)]
-                    n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
-                contextD[kmer] = (n_errors, n_not_error)
+                if opts.kmer_version == 1:    
+                    n_errors = event_kmers[('bad', bqual, mtype, kmer)]
+                    n_not_error = event_kmers[('good', bqual, notype, kmer)]
+                    if not opts.same_good:
+                        n_not_error += event_kmers[('bad', bqual, other_type1, kmer)]
+                        n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
+                elif opts.kmer_version == 2:
+                    n_errors = event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
+                    n_not_error = event_kmers[('good_tuple', BQ_pair, notype, kmer)]
+                    if not opts.same_good:
+                        n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
+                        n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
+
+            contextD[kmer] = (n_errors, n_not_error)
             kpp = get_kmerpapa(super_pattern, contextD, opts)
-            kmer_papas[BQ_pair][mtype] = {}
+            if opts.estimated == "single":
+                estBQ = bqual
+            elif opts.estimated == "double":
+                estBQ = BQ_pair
+            kmer_papas[estBQ][mtype] = {}
             for pat in kpp:
                 alpha, beta = kpp[pat]
                 p_error = min(0.25, alpha / (alpha + beta))
                 if opts.verbosity > 1:
-                    eprint(bqual, mtype, pat, p_error, -10*log10(p_error))
+                    eprint(estBQ, mtype, pat, p_error, -10*log10(p_error))
                 for kmer in matches(pat):
-                    kmer_papas[BQ_pair][mtype][kmer] = p_error
+                    kmer_papas[estBQ][mtype][kmer] = p_error
 
-    # Estimate error rates for pairs of different BQs:
-    for i in range(len(BQs)):
-        for j in range(i+1, len(BQs)):
-            BQ1 = BQs[i]
-            BQ2 = BQs[j]
-            BQ_pair = f'({BQ1},{BQ2})'
-            BQ1_pair = f'({BQ1},{BQ1})'
-            BQ2_pair = f'({BQ2},{BQ2})'
-            kmer_papas[BQ_pair] = {}
-            for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-                kmer_papas[BQ_pair][mtype] = {}
-                for kmer in kmer_papas[BQ1_pair][mtype]:
-                    kmer_papas[BQ_pair][mtype][kmer] = \
-                        sqrt(kmer_papas[BQ1_pair][mtype][kmer]*kmer_papas[BQ2_pair][mtype][kmer])
-                    #TODO: Should we try harmonic mean?
-    
     # Estimate error rates for singletons (not in overlap) bases:
     for BQ in BQs:
         kmer_papas[BQ] = {}
@@ -343,10 +343,37 @@ def run_get_kmerpapas(opts, event_kmers):
             single_EQ = (single_mut+0.1) / (single_mut + single_nomut + 0.2)
             double_EQ = (double_mut+0.1) / (double_mut + double_nomut + 0.2)
             rel_EQ = single_EQ / double_EQ
-            eprint(BQ, mtype, single_EQ, double_EQ, rel_EQ)
-            kmer_papas[BQ][mtype] = {}
-            for kmer in kmer_papas[BQ_pair][mtype]:
-                kmer_papas[BQ][mtype][kmer] = min(kmer_papas[BQ_pair][mtype][kmer] * rel_EQ, 0.25)
+            if not opts.output_file_EQ is None:
+                print(BQ, mtype, single_mut, single_nomut, single_EQ, double_mut, double_nomut, double_EQ, rel_EQ, file = opts.output_file_EQ)
+            
+            if opts.estimated == "single":
+                kmer_papas[BQ_pair][mtype] = {}
+                for kmer in kmer_papas[BQ_pair][mtype]:
+                    kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
+            elif opts.estimated == "double":
+                kmer_papas[BQ][mtype] = {}
+                for kmer in kmer_papas[BQ_pair][mtype]:
+                    kmer_papas[BQ][mtype][kmer] = min(kmer_papas[BQ_pair][mtype][kmer] * rel_EQ, 0.25)
+    
+    if not opts.output_file_EQ is None:
+        opts.output_file_EQ.close()        
+
+    # Estimate error rates for pairs of different BQs:
+    for i in range(len(BQs)):
+        for j in range(i+1, len(BQs)):
+            BQ1 = BQs[i]
+            BQ2 = BQs[j]
+            BQ_pair = f'({BQ1},{BQ2})'
+            BQ1_pair = f'({BQ1},{BQ1})'
+            BQ2_pair = f'({BQ2},{BQ2})'
+            kmer_papas[BQ_pair] = {}
+            for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+                kmer_papas[BQ_pair][mtype] = {}
+                for kmer in kmer_papas[BQ1_pair][mtype]:
+                    kmer_papas[BQ_pair][mtype][kmer] = \
+                        sqrt(kmer_papas[BQ1_pair][mtype][kmer]*kmer_papas[BQ2_pair][mtype][kmer])
+                    #TODO: Should we try harmonic mean?
+
 
     if not opts.output_file_kmerpapa is None:
         for BQ in kmer_papas:
