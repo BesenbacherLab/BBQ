@@ -332,7 +332,11 @@ def run_get_kmerpapas(opts, event_kmers):
             single_nomut = 0
             double_mut = 0
             double_nomut = 0
-            for kmer in kmer_papas[BQ_pair][mtype]:
+            if opts.estimated == 'single':
+                BQest = BQ
+            elif opts.estimated == 'double':
+                BQest = BQ_pair
+            for kmer in kmer_papas[BQest][mtype]:
                 single_mut += event_kmers[('singleton', BQ, mtype, kmer)]
                 single_nomut += event_kmers[('singleton', BQ, notype, kmer)]
                 double_mut += event_kmers[('good_tuple', BQ_pair, mtype, kmer)]
