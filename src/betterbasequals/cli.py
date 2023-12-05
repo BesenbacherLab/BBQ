@@ -309,7 +309,10 @@ def run_get_kmerpapas(opts, event_kmers):
                 estBQ = bqual
             elif opts.estimated == "double":
                 estBQ = BQ_pair
-            kmer_papas[estBQ][mtype] = {}
+
+            kmer_papas[bqual][mtype] = {}    
+            kmer_papas[BQ_pair][mtype] = {}
+            
             for pat in kpp:
                 alpha, beta = kpp[pat]
                 p_error = min(0.25, alpha / (alpha + beta))
@@ -320,7 +323,6 @@ def run_get_kmerpapas(opts, event_kmers):
 
     # Estimate error rates for singletons (not in overlap) bases:
     for BQ in BQs:
-        kmer_papas[BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             ref = mtype[0]
             alt = mtype[-1]
@@ -336,6 +338,7 @@ def run_get_kmerpapas(opts, event_kmers):
                 BQest = BQ
             elif opts.estimated == 'double':
                 BQest = BQ_pair
+
             for kmer in kmer_papas[BQest][mtype]:
                 single_mut += event_kmers[('singleton', BQ, mtype, kmer)]
                 single_nomut += event_kmers[('singleton', BQ, notype, kmer)]
@@ -357,7 +360,7 @@ def run_get_kmerpapas(opts, event_kmers):
                     kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
             elif opts.estimated == "double":
                 kmer_papas[BQ][mtype] = {}
-                for kmer in kmer_papas[BQ_pair][mtype]:
+                for kmer in kmer_papas[BQ][mtype]:
                     kmer_papas[BQ][mtype][kmer] = min(kmer_papas[BQ_pair][mtype][kmer] * rel_EQ, 0.25)
     
     if not opts.output_file_EQ is None:
