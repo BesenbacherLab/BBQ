@@ -356,11 +356,11 @@ def run_get_kmerpapas(opts, event_kmers):
             
             if opts.estimated == "single":
                 kmer_papas[BQ_pair][mtype] = {}
-                for kmer in kmer_papas[BQ_pair][mtype]:
+                for kmer in kmer_papas[BQ][mtype]:
                     kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
             elif opts.estimated == "double":
                 kmer_papas[BQ][mtype] = {}
-                for kmer in kmer_papas[BQ][mtype]:
+                for kmer in kmer_papas[BQ_pair][mtype]:
                     kmer_papas[BQ][mtype][kmer] = min(kmer_papas[BQ_pair][mtype][kmer] * rel_EQ, 0.25)
     
     if not opts.output_file_EQ is None:
