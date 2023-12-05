@@ -86,8 +86,8 @@ def get_parser():
     train_parent.add_argument('--seed', type=int,
         help='seed for numpy.random')
     train_parent.add_argument('--same_good', action='store_true')
-    train_parent.add_argument('--kmer_version', type=int, default = 1)
-    train_parent.add_argument('--estimated', type=str, default = 'double',
+    train_parent.add_argument('--kmer_version', type=int, default = 2)
+    train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
     train_parent.add_argument(
         '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10],
