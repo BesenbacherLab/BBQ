@@ -302,6 +302,13 @@ def run_get_kmerpapas(opts, event_kmers):
                     if not opts.same_good:
                         n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
                         n_not_error += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
+                elif opts.kmer_version == 3:
+                    n_errors = event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
+                    n_not_error = 2 * event_kmers[('good_tuple', BQ_pair, notype, kmer)]
+                    if not opts.same_good:
+                        n_not_error += event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
+                        n_not_error += 2 * event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
+                        n_not_error += 2 * event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
                 contextD[kmer] = (n_errors, n_not_error)
 
             kpp = get_kmerpapa(super_pattern, contextD, opts)
