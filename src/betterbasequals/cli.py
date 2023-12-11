@@ -328,8 +328,12 @@ def run_get_kmerpapas(opts, event_kmers):
                 for kmer in matches(pat):
                     kmer_papas[estBQ][mtype][kmer] = p_error
 
-    # Estimate error rates for singletons (not in overlap) bases:
+    # Estimate EQ correction for bases in overlaps
+    single_EQ = {}
+    double_EQ = {}
     for BQ in BQs:
+        single_EQ[BQ] = {}
+        double_EQ[BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             ref = mtype[0]
             alt = mtype[-1]
@@ -355,12 +359,34 @@ def run_get_kmerpapas(opts, event_kmers):
                 double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
                 double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
                 double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
-            single_EQ = (single_mut+0.1) / (single_mut + single_nomut + 0.2)
-            double_EQ = (double_mut+0.1) / (double_mut + double_nomut + 0.2)
-            rel_EQ = single_EQ / double_EQ
+            single_EQ[BQ][mtype] = (single_mut+0.1) / (single_mut + single_nomut + 0.2)
+            double_EQ[BQ][mtype] = (double_mut+0.1) / (double_mut + double_nomut + 0.2)
+           
+           # rel_EQ = single_EQ / double_EQ
+
+            #if not opts.output_file_EQ is None:
+            #    print(BQ, mtype, single_mut, single_nomut, single_EQ, double_mut, double_nomut, double_EQ, rel_EQ, file = opts.output_file_EQ)
+
+    #if not opts.output_file_EQ is None:
+    #    opts.output_file_EQ.close()        
+
+    max_BQ = max(BQs)
+
+    # apply EQ correction
+    for BQ in BQs:
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+            BQ_pair = f'({BQ},{BQ})'
+            if BQ < max_BQ:
+                if (single_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8) and (double_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8):
+                    subtract = single_EQ[max_BQ][mtype]
+                else:
+                    subtract = 0.0
+
+                rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
+
             if not opts.output_file_EQ is None:
-                print(BQ, mtype, single_mut, single_nomut, single_EQ, double_mut, double_nomut, double_EQ, rel_EQ, file = opts.output_file_EQ)
-            
+                print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
+
             if opts.estimated == "single":
                 kmer_papas[BQ_pair][mtype] = {}
                 for kmer in kmer_papas[BQ][mtype]:
@@ -371,7 +397,7 @@ def run_get_kmerpapas(opts, event_kmers):
                     kmer_papas[BQ][mtype][kmer] = min(kmer_papas[BQ_pair][mtype][kmer] * rel_EQ, 0.25)
     
     if not opts.output_file_EQ is None:
-        opts.output_file_EQ.close()        
+        opts.output_file_EQ.close() 
 
     # Estimate error rates for pairs of different BQs:
     for i in range(len(BQs)):
