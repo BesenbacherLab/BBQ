@@ -376,13 +376,14 @@ def run_get_kmerpapas(opts, event_kmers):
     for BQ in BQs:
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             BQ_pair = f'({BQ},{BQ})'
-            if BQ < max_BQ:
-                if (single_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8) and (double_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8):
-                    subtract = single_EQ[max_BQ][mtype]
-                else:
-                    subtract = 0.0
+            if ((BQ < max_BQ) and 
+                (single_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8) and 
+                (double_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8)):
+                subtract = single_EQ[max_BQ][mtype]
+            else:
+                subtract = 0.0
 
-                rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
+            rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
 
             if not opts.output_file_EQ is None:
                 print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
