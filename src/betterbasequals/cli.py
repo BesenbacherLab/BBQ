@@ -379,7 +379,7 @@ def run_get_kmerpapas(opts, event_kmers):
             if ((BQ < max_BQ) and 
                 (single_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8) and 
                 (double_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8)):
-                subtract = single_EQ[max_BQ][mtype]
+                subtract = double_EQ[max_BQ][mtype]
             else:
                 subtract = 0.0
 
