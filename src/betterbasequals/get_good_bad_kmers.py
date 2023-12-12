@@ -2,7 +2,7 @@ import pysam
 import py2bit
 import os
 from collections import Counter
-from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, eprint, open_bam_w_index
+from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, eprint, open_bam_w_index, SortedBed
 
 def get_mut_type(ref, alt):
     if ref in ['T', 'G']:
@@ -11,6 +11,11 @@ def get_mut_type(ref, alt):
         mtype = ref + '->' + alt
     return mtype
 
+def get_BQ_pair(BQ1, BQ2):
+    if BQ1 > BQ2:
+        return f'({BQ1},{BQ2})'
+    else:
+        return f'({BQ2},{BQ1})'
 
 class MutationCounterWFilter:
     def __init__(
@@ -32,6 +37,7 @@ class MutationCounterWFilter:
         max_filter_depth = 100,
         min_enddist = 6,
         max_mismatch = 2,
+        bed_file = None,
         #output,
     ):
         self.bam_file = open_bam_w_index(bam_file)
@@ -62,30 +68,25 @@ class MutationCounterWFilter:
         self.max_filter_depth = max_filter_depth
         self.min_enddist = min_enddist
         self.max_mismatch = max_mismatch
+        if not bed_file is None:
+            self.bed = SortedBed(bed_file)
+        else:
+            self.bed = None
 
     def __del__(self):
         self.tb.close()
 
     def count_mutations_all_chroms(self):
-        good_kmers = Counter()
-        bad_kmers = Counter()
+        event_kmers = Counter()
         for idx_stats in self.bam_file.get_index_statistics():
             if idx_stats.mapped > 0:
-                good_c, bad_c = self.count_mutations(idx_stats.contig, None, None)
-                good_kmers += good_c
-                bad_kmers += bad_c
-        return good_kmers, bad_kmers
+                event_c = self.count_mutations(idx_stats.contig, None, None)
+                event_kmers += event_c
+        return event_kmers
 
 
     def count_mutations(self, chrom, start, stop):
-        #if self.base_quals is None:
-        #    good_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
-        #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in range(1,99)}
-        #else:
-        #    good_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
-        #    bad_kmers = {y:{x:Counter() for x in mtypes} for y in self.base_quals}
-        good_kmers = Counter()
-        bad_kmers = Counter()
+        event_kmers = Counter()
 
         pileup = self.bam_file.pileup(
             contig = chrom,
@@ -131,29 +132,34 @@ class MutationCounterWFilter:
                 else:
                     major = n_alleles.most_common(1)[0]
 
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers, major[0])
+                self.handle_pileup(pileupcolumn, event_kmers, major[0])
         else:
             for pileupcolumn in pileup:
-                self.handle_pileup(pileupcolumn, good_kmers, bad_kmers)
+                self.handle_pileup(pileupcolumn, event_kmers)
         
-        return good_kmers, bad_kmers
+        return event_kmers
 
-    def handle_pileup(self, pileupcolumn, good_kmers, bad_kmers, major_allele = None):
+    def handle_pileup(self, pileupcolumn, event_kmers, major_allele = None):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%10000 ==0:
-            eprint(f"{chrom}:{ref_pos}")            
+            eprint(f"{chrom}:{ref_pos}")    
+
+        if not self.bed is None and self.bed.query(chrom, ref_pos):
+            return
         #if not self.bed_query_func(chrom, ref_pos):
         #    continue
-        if ref_pos-self.radius < 0:
+        if ref_pos - self.radius < 0:
             return 
 
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
+        
         if 'N' in kmer:
             return
         
         if len(kmer) != 2*self.radius + 1:
             return 0
+        
         ref = kmer[self.radius]
 
         #If the major in the filter bam file does not match the ref we ignore the site.
@@ -162,6 +168,7 @@ class MutationCounterWFilter:
 
         if ref not in "ATGC":
             return
+        
         if ref not in ['A', 'C']:
             kmer = reverse_complement(kmer)
 
@@ -174,24 +181,22 @@ class MutationCounterWFilter:
 
         for pileup_read in pileupcolumn.pileups:
             # test for deletion at pileup
-            if pileup_read.is_del or pileup_read.is_refskip:
-                continue
+            #if pileup_read.is_del or pileup_read.is_refskip:
+            #    continue
             coverage += 1
             #TODO: should consider what the right solution is if there is deletion at overlap
 
             # fetch read information
             read = Read(pileup_read)
-            if not read.is_good(self.min_enddist, self.max_mismatch):
-                continue
             
-            # test if read is okay
-            if (
-                read.allel not in "ATGC"
-                or read.start is None
-                or read.end is None
-                #or read.NH != 1
-            ):
-                continue
+            # # test if read is okay
+            # if (
+            #     read.allel not in "ATGC"
+            #     or read.start is None
+            #     or read.end is None
+            #     #or read.NH != 1
+            # ):
+            #     continue
 
             if read.base_qual > 30:
                 n_alleles[read.allel] += 1
@@ -200,23 +205,36 @@ class MutationCounterWFilter:
             if read.query_name in reads_mem:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
+                
+                if (not read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) or (not mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq)):
+                    continue
 
                 if read.allel == mem_read.allel:
                     event_list.append(('good', read.allel, read.base_qual))
-                    event_list.append(('good', read.allel, mem_read.base_qual))
-                    
+                    event_list.append(('good', mem_read.allel, mem_read.base_qual))
+                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
+
                     if max(read.base_qual, mem_read.base_qual) > 30:
                         has_good.add(read.allel)
 
                 else:
-
-                    if read.allel != ref:
+                    if read.allel != ref and mem_read.allel == ref:# and mem_read.base_qual > 30:
                         event_list.append(('bad', read.allel, read.base_qual))
+                        event_list.append(('good', mem_read.allel, mem_read.base_qual))
+                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
 
-                    elif mem_read.allel != ref:
+                    elif mem_read.allel != ref and read.allel == ref:# and read.base_qual > 30:
                         event_list.append(('bad', mem_read.allel, mem_read.base_qual))
+                        event_list.append(('good', read.allel, read.base_qual))
+                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
+
             else:            
                 reads_mem[read.query_name] = read
+        
+        # Handle reads without partner (ie. no overlap)
+        for read in reads_mem.values():
+            if read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
+                event_list.append(('singleton', read.allel, read.base_qual))
 
         if coverage < self.min_depth or coverage > self.max_depth:
             return
@@ -246,10 +264,6 @@ class MutationCounterWFilter:
 
         for event_type, allele, base_qual in event_list:
             mut_type = get_mut_type(ref, allele)     
-
-            if event_type == 'good':
-                good_kmers[(base_qual, mut_type, kmer)] += 1
-
-            elif event_type == 'bad':
-                bad_kmers[(base_qual, mut_type, kmer)] += 1
+            
+            event_kmers[(event_type, base_qual, mut_type, kmer)] += 1
 

@@ -71,40 +71,6 @@ def get_average_coverage(bamfile):
 
     return (n_mapped * read_len)/genome_len
 
-
-
-# def regions(bed_file):
-#     with open(bed_file) as fp:
-#         reader = csv.reader(fp, delimiter="\t")
-#         for line in reader:
-#             yield line[0], int(line[1]), int(line[2])
-
-# def regions_if_sorted(bed_file):
-#     with open(bed_file) as fp:
-#         reader = csv.reader(fp, delimiter="\t")
-#         for line in reader:
-#             yield line[0], int(line[1]), int(line[2])
-
-# def generate_mutation_types(k):
-#     if k % 2 == 0:
-#         raise ValueError("k must be uneven")
-#     types = list()
-#     mut_pos = (k - 1) // 2
-#     for mer in map(
-#         partial(reduce, add),
-#         product(*(["ATGC"] * mut_pos + ["TC"] + ["ATGC"] * mut_pos)),
-#     ):
-#         alts = "ATG"
-#         if mer[mut_pos] == "T":
-#             alts = "AGC"
-#         for alt in alts:
-#             after = mer[:mut_pos] + alt + mer[mut_pos + 1 :]
-#             mut = ">".join([mer[mut_pos],alt])
-#             types.append("_".join([mut, mer]))
-#     return sorted(types)
-
-# mutation_types_3_mer = dict(zip(generate_mutation_types(3), count()))
-
 code = {'A':['A'],
         'C':['C'],
         'G':['G'],
@@ -140,15 +106,21 @@ class Read:
         # set attributes
         self.start = pileup_read.alignment.reference_start
         self.end = pileup_read.alignment.reference_end
-        self.allel = pileup_read.alignment.query_sequence[self.pos]
+
+        if pileup_read.is_del or pileup_read.is_refskip:
+            self.allel = '-'
+            self.base_qual = 0
+        else:
+            self.allel = pileup_read.alignment.query_sequence[self.pos]
+            self.base_qual = pileup_read.alignment.query_qualities[self.pos]
+            self.enddist = min(self.pos, len(pileup_read.alignment.query_sequence)-self.pos)
+
         self.is_reverse = pileup_read.alignment.is_reverse
-        self.base_qual = pileup_read.alignment.query_qualities[self.pos]
         self.query_name = pileup_read.alignment.query_name
         self.length = abs(pileup_read.alignment.template_length)
         self.isR1 = pileup_read.alignment.is_read1
         self.mapq = pileup_read.alignment.mapping_quality
         #self.NH = pileup_read.alignment.get_tag("NH")
-        self.enddist = min(self.pos, len(pileup_read.alignment.query_sequence)-self.pos)
         # Process cigar stats
         cigar_stats = pileup_read.alignment.get_cigar_stats()[0]
         self.has_indel = sum(cigar_stats[1:4]) != 0
@@ -157,11 +129,13 @@ class Read:
         self.NM = cigar_stats[10]
         #print(pileup_read.alignment.get_cigar_stats())
     
-    def is_good(self, min_enddist=6, max_mismatch = 2):
+    def is_good(self, min_enddist=6, max_mismatch = 2, min_mapq = 50):
         return (self.NM <= max_mismatch and
                 not self.has_indel and
                 not self.has_clip and
-                self.enddist >= min_enddist)
+                self.enddist >= min_enddist and
+                self.mapq >= min_mapq and
+                self.allel in ['A', 'C', 'G', 'T'])
 
 
 class ReadPair:
@@ -173,7 +147,6 @@ class ReadPair:
         self.max_NM = max(read1.NM, read2.NM)
         self.has_indel = 1 if (read1.has_indel or read2.has_indel) else 0
         self.has_clip = 1 if (read1.has_clip or read2.has_clip) else 0
-
 
 
 
@@ -262,31 +235,41 @@ def open_bam_w_index(bam_file):
         pysam.index(bam_file)
     return pysam.AlignmentFile(bam_file, "rb")
 
-def read_kmers(opts):
-    if opts.verbosity > 0:
-        eprint("Reading good and bad kmers")
-    good_kmers = {}
-    for line in opts.input_file_good:
-        bqual, mtype, kmer, count = line.split()
-        bqual = int(bqual)
-        if bqual not in good_kmers:
-            good_kmers[bqual] = {}
-            for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
-                good_kmers[bqual][muttype] = defaultdict(int)
-        good_kmers[bqual][mtype][kmer] = int(count)
+# def read_kmers(opts):
+#     if opts.verbosity > 0:
+#         eprint("Reading good and bad kmers")
+#     good_kmers = {}
+#     for line in opts.input_file_good:
+#         bqual, mtype, kmer, count = line.split()
+#         bqual = int(bqual)
+#         if bqual not in good_kmers:
+#             good_kmers[bqual] = {}
+#             for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
+#                 good_kmers[bqual][muttype] = defaultdict(int)
+#         good_kmers[bqual][mtype][kmer] = int(count)
 
-    bad_kmers = {}
-    for line in opts.input_file_bad:
-        bqual, mtype, kmer, count = line.split()
-        if count == "0":
-            continue
-        bqual = int(bqual)
-        if bqual not in bad_kmers:
-            bad_kmers[bqual] = {}
-            for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-                bad_kmers[bqual][muttype] = defaultdict(int)
-        bad_kmers[bqual][mtype][kmer] = int(count)
-    return good_kmers, bad_kmers
+#     bad_kmers = {}
+#     for line in opts.input_file_bad:
+#         bqual, mtype, kmer, count = line.split()
+#         if count == "0":
+#             continue
+#         bqual = int(bqual)
+#         if bqual not in bad_kmers:
+#             bad_kmers[bqual] = {}
+#             for muttype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+#                 bad_kmers[bqual][muttype] = defaultdict(int)
+#         bad_kmers[bqual][mtype][kmer] = int(count)
+#     return good_kmers, bad_kmers
+
+def read_kmers(opts):
+    event_kmers = defaultdict(int)
+    if opts.verbosity > 0:
+        eprint("Reading kmer counts")
+    for line in opts.input_file_kmers:
+        event_type, bqual, mtype, kmer, count = line.split()
+        event_kmers[(event_type, bqual, mtype, kmer)] = int(count)
+    return event_kmers
+
 
 # def read_kmer_papas(opts):
 #     kmer_papas = {}
@@ -313,19 +296,31 @@ def read_kmers(opts):
 #         kmer_papas[bqual][mtype][pattern] = float(correction_factor)
 #     return kmer_papas
 
+# def read_kmer_papas(opts):
+#     kmer_papas = {}
+#     for line in opts.input_file_kmerpapa:
+#         bqual, mtype, pattern, alpha, beta = line.split()
+#         alpha = float(alpha)
+#         beta = float(beta)
+#         bqual=int(bqual)
+#         if bqual not in kmer_papas:
+#             kmer_papas[bqual] = {}
+#         if mtype not in kmer_papas[bqual]:
+#             kmer_papas[bqual][mtype] = {}
+#         for context in matches(pattern):
+#             kmer_papas[bqual][mtype][context] = (alpha, beta)
+#     return kmer_papas
+
 def read_kmer_papas(opts):
     kmer_papas = {}
     for line in opts.input_file_kmerpapa:
-        bqual, mtype, pattern, alpha, beta = line.split()
-        alpha = float(alpha)
-        beta = float(beta)
-        bqual=int(bqual)
+        bqual, mtype, kmer, p_error = line.split()
+        p_error = float(p_error)
         if bqual not in kmer_papas:
             kmer_papas[bqual] = {}
         if mtype not in kmer_papas[bqual]:
             kmer_papas[bqual][mtype] = {}
-        for context in matches(pattern):
-            kmer_papas[bqual][mtype][context] = (alpha, beta)
+        kmer_papas[bqual][mtype][kmer] = p_error
     return kmer_papas
 
 def read_kmer_papas_for_test(opts):
@@ -352,6 +347,14 @@ def print_kmer_papas(opts, kmer_papas):
                     print(bqual, mtype, pat, Q, file=opts.output_file_kmerpapa)
         opts.output_file_kmerpapa.close()
 
+
+def print_kmer_counts(opts, event_kmers):
+    if not opts.output_file_kmers is None:
+        for tup, count in event_kmers.items():
+            print(" ".join(str(x) for x in tup), count, file = opts.output_file_kmers)
+    opts.output_file_kmers.close()
+
+
 # def print_good_and_bad(opts, good_kmers, bad_kmers):
 #     if not opts.output_file_good is None:
 #         for bqual in good_kmers:
@@ -368,17 +371,23 @@ def print_kmer_papas(opts, kmer_papas):
 #                     print(bqual, mtype, kmer, bad_kmers[bqual][mtype][kmer], file = opts.output_file_bad)
 #         opts.output_file_bad.close()
 
-def print_good_and_bad(opts, good_kmers, bad_kmers):
-    if not opts.output_file_good is None:
-        for tup, count in good_kmers.items():
-            bqual, mtype, kmer = tup
-            print(bqual, mtype, kmer, count , file = opts.output_file_good)
-        opts.output_file_good.close()
-    if not opts.output_file_bad is None:
-        for tup, count in bad_kmers.items():
-            bqual, mtype, kmer = tup
-            print(bqual, mtype, kmer, count , file = opts.output_file_bad)
-        opts.output_file_bad.close()
+# def print_good_and_bad(opts, good_kmers, bad_kmers, single_kmers):
+#     if not opts.output_file_good is None:
+#         for tup, count in good_kmers.items():
+#             bqual, mtype, kmer = tup
+#             print(bqual, mtype, kmer, count , file = opts.output_file_good)
+#         opts.output_file_good.close()
+#     if not opts.output_file_bad is None:
+#         for tup, count in bad_kmers.items():
+#             bqual, mtype, kmer = tup
+#             print(bqual, mtype, kmer, count , file = opts.output_file_bad)
+#         opts.output_file_bad.close()
+#     if not opts.output_file_single is None:
+#         for tup, count in single_kmers.items():
+#             bqual, mtype, kmer = tup
+#             print(bqual, mtype, kmer, count , file = opts.output_file_single)
+#         opts.output_file_single.close()
+
 
 def parse_opts_region(opts):
     if opts.region is None:
@@ -488,3 +497,34 @@ def print_base_probs(base_probs):
         for x in D:
             p_A2X, p_R2X, MQ = x
             print(phred2p(p_A2X),phred2p(p_R2X), D[x], sep = '\t')
+
+class SortedBed:
+    def __init__(self, bedname):
+        self.name = bedname
+        self.f = open(bedname)
+        self.bed_chrom = 'chr0'
+        self.bed_start = -1
+        self.bed_end = -1
+
+    def query(self, chrom, pos):
+        # TODO: check if the input is sorted
+        while self.bed_chrom < chrom or (self.bed_chrom == chrom and self.bed_end <= pos):
+            bedL = self.f.readline().split()
+            if len(bedL) == 0:
+                break
+            if (bedL[0] == self.bed_chrom and
+                ((int(bedL[1])+1) < self.bed_start or
+                 (int(bedL[2])+1) < self.bed_end)):
+                eprint("bed positions not sorted:", self.name)
+                eprint(' '.join(bedL))
+                eprint( self.bed_chrom, self.bed_start, self.bed_end)
+                sys.exit()
+            if bedL[0] < self.bed_chrom:
+                eprint("bed chromosomes not sorted:", self.name)
+                eprint(' '.join(bedL))
+                eprint(self.bed_chrom, self.bed_start, self.bed_end)
+                sys.exit()
+            self.bed_chrom = bedL[0]
+            self.bed_start = int(bedL[1])+1
+            self.bed_end = int(bedL[2])+1
+        return (chrom == self.bed_chrom) and ( self.bed_start <= pos) and (pos < self.bed_end)

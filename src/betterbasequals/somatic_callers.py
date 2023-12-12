@@ -1,6 +1,6 @@
 import py2bit
 from scipy.optimize import minimize_scalar
-from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read, change_mtypes, SW_type
+from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read, change_mtypes, SW_type, SortedBed
 from collections import Counter, defaultdict
 import scipy.stats
 import math
@@ -10,84 +10,90 @@ def GQ_sum(alt_BQs, ref_BQs):
 
 def get_LR(base_probs):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
-    # It is ok that I use phred scales insted of the usual natural log.
-    # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
+
     def p_data_given_mut(alpha):
-        return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x, _ in base_probs)
+        return - sum(math.log(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x, _ in base_probs)
         
         # If probabilities in base_probs are not phred scaled. It becomes this:
         #return sum(p2phred(alpha * p_a2x + (1-alpha)*p_r2x) for p_a2x, p_r2x in base_probs)
         
-        #Maybe we can weigh the read prob using the mapping quality
-        #return sum(p2phred((1-p_map_error)*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) +p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-
     res = minimize_scalar(p_data_given_mut, bounds=(0, 1), method='bounded')
-    # Alternative:
-    # Integrate out alpha (maybe I should call the getBF (Bayes Factor) instead of getLR then)
-    # LL, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
-    # Bør nok have prior fordeling på alpha så.
-    N = len(base_probs)
-    N_A = sum(1 for x,y,_ in base_probs if x<y)
-    alpha = res.x
 
-    #if N_A > 1:
-    #    print(base_probs)
-    #    print([p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs])
-    #    eprint(f'alpha={res.x} N={N} N_A={N_A}')
-    #    print(res.fun, sum(p_r2x for p_a2x, p_r2x in base_probs),  res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs))
-    #LR = res.fun - sum(p2phred((1-p_map_error)*phred2p(p_r2x)+p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-    LR = res.fun - sum(p_r2x for p_a2x, p_r2x, _ in base_probs)
-    return LR, N, N_A, alpha
+    alpha = res.x
+    LR = - res.fun + p_data_given_mut(0)
+    return LR, alpha
+
+
+def get_maxLR_with_MQ(base_probs):
+    #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
+
+    LL_with_alt = sum(math.log((1-phred2p(p_map_error))*max(phred2p(p_a2x),phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs if p_r2x > p_a2x)
+    LL_no_alt = sum(math.log((1-phred2p(p_map_error))*phred2p(p_r2x) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs if p_r2x > p_a2x)
+
+    LR = LL_with_alt - LL_no_alt
+    return LR
+
 
 def get_LR_with_MQ(base_probs):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
-    # It is ok that I use phred scales insted of the usual natural log.
-    # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
+
     def p_data_given_mut(alpha):
         #return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
-        return sum(p2phred((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
+        return - sum(math.log((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs)
 
     res = minimize_scalar(p_data_given_mut, bounds=(0, 1), method='bounded')
-
-    N = len(base_probs)
-    N_A = sum(1 for x,y,_ in base_probs if x<y)
     alpha = res.x
-
-    LR = res.fun - sum(p2phred((1-phred2p(p_map_error))*phred2p(p_r2x)+phred2p(p_map_error)*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-    return LR, N, N_A, alpha
+    LR = - res.fun + p_data_given_mut(0)
+    return LR, alpha
 
 
 def get_BF(base_probs):
     #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
-    # It is ok that I use phred scales insted of the usual natural log.
-    # Because the ratio will be the same as log(x)/log(y) == log10(x)/log10(y))
+
     def p_data_given_mut(alpha):
-        return sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs)
+        return phred2p(sum(p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x, _ in base_probs))
         
-        # If probabilities in base_probs are not phred scaled. It becomes this:
-        #return sum(p2phred(alpha * p_a2x + (1-alpha)*p_r2x) for p_a2x, p_r2x in base_probs)
-        
-        #Maybe we can weigh the read prob using the mapping quality
-        #return sum(p2phred((1-p_map_error)*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) +p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
+    # Integrate out alpha 
+    p_no_alpha, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
 
-    #res = minimize_scalar(p_data_given_mut, bounds=(0, 1), method='bounded')
-    # Alternative:
-    # Integrate out alpha (maybe I should call the getBF (Bayes Factor) instead of getLR then)
-    LL, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
-    # Bør nok have prior fordeling på alpha så.
-    N = len(base_probs)
-    N_A = sum(1 for x,y in base_probs if x<y)
-    alpha = res.x
+    try:
+        log_BF = math.log(p_no_alpha) - math.log(p_data_given_mut(0))
+    except:
+        log_BF = -1000
 
-    #if N_A > 1:
-    #    print(base_probs)
-    #    print([p2phred(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) for p_a2x, p_r2x in base_probs])
-    #    eprint(f'alpha={res.x} N={N} N_A={N_A}')
-    #    print(res.fun, sum(p_r2x for p_a2x, p_r2x in base_probs),  res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs))
-    #LR = res.fun - sum(p2phred((1-p_map_error)*phred2p(p_r2x)+p_map_error*0.25) for p_a2x, p_r2x, p_map_error in base_probs)
-    LR = res.fun - sum(p_r2x for p_a2x, p_r2x in base_probs)
-    return LR, N, N_A, alpha
+    return log_BF
 
+def get_BF_with_MQ(base_probs):
+    #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
+
+    def p_data_given_mut(alpha):
+        return phred2p(sum(p2phred((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs))
+
+    # Integrate out alpha
+    p_no_alpha, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
+
+    try:
+        log_BF = math.log(p_no_alpha) - math.log(p_data_given_mut(0))
+    except:
+        log_BF = -1000
+
+    return log_BF
+
+def get_BF_with_MQ_and_Prior(base_probs, a=1, b=2):
+    #base_probs = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
+
+    def p_data_given_mut(alpha):
+        return scipy.stats.beta.pdf(alpha, a, b) * phred2p(sum(p2phred((1-phred2p(p_map_error))*(alpha * phred2p(p_a2x) + (1-alpha)*phred2p(p_r2x)) + phred2p(p_map_error)*0.5) for p_a2x, p_r2x, p_map_error in base_probs))
+
+    # Integrate out alpha
+    p_no_alpha, error = scipy.integrate.quad(p_data_given_mut, 0, 1)
+
+    try:
+        log_BF =  math.log(p_no_alpha) - math.log(p_data_given_mut(0))
+    except:
+        log_BF = - 1000
+
+    return log_BF
 
 
 class SomaticMutationCaller:
@@ -102,21 +108,20 @@ class SomaticMutationCaller:
         cutoff,
         prior_N,
         no_update,
-        N_rate,
         mapq = 50,
         min_base_qual = 1,
         min_filter_count = 2,
         pop_vcf = None,
         min_enddist = 6,
         max_mismatch = 2,
-        mean_type = "arithmetric",
-        BQ_freq_method = 'global',
+        max_NM_diff = 1,
         filter_mapq = 20,
-        min_base_qual_filter=20, 
-        min_depth=1, 
-        max_depth=1000000,
-        radius=3, 
-        prefix="", 
+        min_base_qual_filter = 20, 
+        min_depth = 1, 
+        max_depth = 1000000,
+        radius = 3, 
+        prefix = "",
+        bed_file = None,
     ):
 
         # Open files for reading
@@ -133,76 +138,10 @@ class SomaticMutationCaller:
 
         self.outfile = outfile
         self.method = method
-        self.BQ_freq_method = BQ_freq_method
-
-        if BQ_freq_method == 'global_by_type':
-            self.BQ_freq = {}
-            for BQ in kmer_papa:
-                self.BQ_freq[BQ] = {}
-                for muttype in kmer_papa[BQ]:
-                    self.BQ_freq[BQ][muttype] = 0
-                    for kmer in kmer_papa[BQ][muttype]:
-                        a,b  = kmer_papa[BQ][muttype][kmer]
-                        self.BQ_freq[BQ][muttype] += a + b
-            
-            for muttype in change_mtypes:
-                total_sum = sum(self.BQ_freq[BQ][muttype] for BQ in self.BQ_freq)
-                for BQ in self.BQ_freq:
-                    self.BQ_freq[BQ][muttype] = self.BQ_freq[BQ][muttype]/total_sum
-
-            assert (self.BQ_freq[11]['A->C'] + self.BQ_freq[25]['A->C'] + self.BQ_freq[37]['A->C']) -1.0 < 1e-7
-        elif BQ_freq_method == 'global_by_base':
-            self.BQ_freq = {}
-            for BQ in kmer_papa:
-                self.BQ_freq[BQ] = {'A':0, 'C':0}
-                for muttype in kmer_papa[BQ]:
-                    for kmer in kmer_papa[BQ][muttype]:
-                        a,b  = kmer_papa[BQ][muttype][kmer]
-                        self.BQ_freq[BQ][muttype[0]] += a + b
-            
-            for base in ['A', 'C']:
-                total_sum = sum(self.BQ_freq[BQ][base] for BQ in self.BQ_freq)
-                for BQ in self.BQ_freq:
-                    self.BQ_freq[BQ][base] = self.BQ_freq[BQ][base]/total_sum
-            assert (self.BQ_freq[11]['A'] + self.BQ_freq[25]['A'] + self.BQ_freq[37]['A']) -1.0 < 1e-7
-        elif BQ_freq_method == 'global':
-            self.BQ_freq = {}
-            for BQ in kmer_papa:
-                self.BQ_freq[BQ] = 0
-                for muttype in kmer_papa[BQ]:                
-                    for kmer in kmer_papa[BQ][muttype]:
-                        a,b  = kmer_papa[BQ][muttype][kmer]
-                        self.BQ_freq[BQ] += a + b
-        
-            total_sum = sum(self.BQ_freq.values())
-            total_sum += (N_rate*total_sum)/(1-N_rate)
-            for BQ in self.BQ_freq:
-                self.BQ_freq[BQ] = self.BQ_freq[BQ]/total_sum
-            
-            assert (self.BQ_freq[11] + self.BQ_freq[25] + self.BQ_freq[37] + N_rate) -1.0 < 1e-7
-        else:
-            assert False, f'Unknown BQ_freq_method : {BQ_freq_method}'
-
-        #This should be handled in pileup code now.
-        #if self.method == 'LR':
-            # make sure that all X->X are also in kmerpapa
-            # mtype_tups = ('C->C', ('C->A', 'C->G', 'C->T')), ('A->A', ('A->C', 'A->G', 'A->T'))
-            # for BQ in self.mut_probs:
-            #     for stay_type, change_types in mtype_tups:
-            #         self.mut_probs[BQ][stay_type] = {}
-            #         for kmer in self.mut_probs[BQ][change_types[0]]:
-            #             p = 1.0
-            #             for change_type in change_types:
-            #                 #TODO: should we use log-sum-exp function for numerical stability?
-            #                 #p -= phred2p(self.mut_probs[BQ][change_type][kmer])
-            #                 alpha,beta = self.mut_probs[BQ][change_type][kmer]
-            #                 p -= alpha/(alpha+beta)
-            #             self.mut_probs[BQ][stay_type][kmer] = (p, None)
 
         self.cutoff = cutoff
         self.prior_N = prior_N
         self.no_update = no_update
-        self.N_rate = N_rate
 
         if not pop_vcf is None:
             self.pop_vcf = VcfAfReader(pop_vcf)
@@ -211,7 +150,7 @@ class SomaticMutationCaller:
 
         self.min_enddist = min_enddist
         self.max_mismatch = max_mismatch
-        self.mean_type = mean_type
+        self.max_NM_diff = max_NM_diff
         self.mapq = mapq
         self.min_base_qual = min_base_qual
         self.filter_mapq = filter_mapq
@@ -221,23 +160,16 @@ class SomaticMutationCaller:
         self.radius = radius
         self.prefix = prefix
         self.filter_variants = False
-        self.filter_reads = True
-
 
         #TODO: filter_depth variable should be set based on average coverage in filter file.
         self.min_filter_depth = 10
         self.max_filter_depth = 1000000
         self.min_filter_count = min_filter_count
 
-        # Create correction factor dict:
-
-        # self.correction_factor = {mtype:{} for mtype in kmer_papa}
-        # print(self.correction)
-        # for mtype in kmer_papa:
-        #     for kmer in kmer_papa[mtype]:
-        #         p = kmer_papa[mtype][kmer]
-        #         self.correction_factor[mtype][kmer] = -10*log10(p/(p-1))
-        #         #self.correction_factor[mtype][kmer] = -10*log10(p)
+        if not bed_file is None:
+            self.bed = SortedBed(bed_file)
+        else:
+            self.bed = None
                 
 
     def __del__(self):
@@ -257,7 +189,7 @@ class SomaticMutationCaller:
             stop = stop,
             truncate = True,
             max_depth = 1000000,
-            min_mapping_quality = self.mapq,
+            min_mapping_quality = 0, #self.mapq,
             ignore_overlaps = False,
             flag_require = 0,  # No requirements
             flag_filter = 3840,
@@ -297,14 +229,16 @@ class SomaticMutationCaller:
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
         if ref_pos%100000 == 0:
-            eprint(f"{chrom}:{ref_pos}")            
-        #if not self.bed_query_func(chrom, ref_pos):
-        #    continue
+            eprint(f"{chrom}:{ref_pos}")
+
+        if not self.bed is None and self.bed.query(chrom, ref_pos):
+            return 0
 
         n_calls = 0
 
         if ref_pos-self.radius < 0:
             return 0
+        
         kmer = self.tb.sequence(self.prefix + chrom, ref_pos- self.radius, ref_pos + self.radius + 1)
         if 'N' in kmer:
             return 0
@@ -320,8 +254,8 @@ class SomaticMutationCaller:
         elif self.method == 'sum':
             raise NotImplementedError
             #sum = sum(from_R for from_A,from_R in base_probs[A] if from_A < from_R)
-        elif self.method in ['LR','LR_with_MQ']:
-            base_probs, BQs, n_mismatch, n_double, n_pos, n_neg = \
+        elif self.method in ['LR','LR_with_MQ', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior', 'maxLR_with_MQ']:
+            base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered = \
                 self.get_alleles_w_probabities_update(pileupcolumn, ref, kmer)
             #base_probs[A] = [(P(A -> X_read_i|read_i),P(R -> X_read_i|read_i), ..., ]
 
@@ -344,35 +278,85 @@ class SomaticMutationCaller:
                 if len(altMQs) == 0:
                     continue
                 altMQs.sort()
-                medianMQ=altMQs[len(altMQs)//2]
+                medianMQ = altMQs[len(altMQs)//2]
                 
+                N_total = sum(n_filtered.values()) + sum(n_nonfiltered.values())
+
                 if medianMQ < 30:
                     if self.filter_variants:
                         continue
                     else:
                         F_list.append("lowMQ")
-                if self.method == 'LR':
-                    LR, N, N_A, AF = get_LR(base_probs[A])
-                elif self.method == 'LR_with_MQ':
-                    LR, N, N_A, AF = get_LR_with_MQ(base_probs[A])
 
-                QUAL = -LR
+                refMQs = [MQ for x,y,MQ in base_probs[A] if x>y]
+                refMQs.sort()
+                
+                if len(refMQs)>0:
+                    ref_medianMQ = refMQs[len(refMQs)//2]
+                else:
+                    ref_medianMQ = 0
+                    continue
+
+                AF = None
+                if self.method == 'LR':
+                    QUAL, AF = get_LR(base_probs[A])
+                elif self.method == 'LR_with_MQ':
+                    QUAL, AF = get_LR_with_MQ(base_probs[A])
+                elif self.method == 'maxLR_with_MQ':
+                    QUAL = get_maxLR_with_MQ(base_probs[A])
+                elif self.method == 'BF':
+                    QUAL = get_BF(base_probs[A])
+                elif self.method == 'BF_with_MQ':
+                    QUAL = get_BF_with_MQ(base_probs[A])
+                elif self.method == 'BF_with_MQ_and_Prior':
+                    QUAL = get_BF_with_MQ_and_Prior(base_probs[A])
+
                 if self.cutoff is None or QUAL >= self.cutoff:
+
+                    N = len(base_probs[A])
+                    N_A = sum(1 for x,y,_ in base_probs[A] if x<y)
+                    if AF is None:
+                        AF = N_A/N
+
                     oldBQ_str = '[' + ','.join(x[-1] for x in BQs[A]) + ']'
                     newBQ = '[' +','.join(f'{x[1]:.1f}' for x in BQs[A]) + ']'
                     
                     oldBQ = [x[0] for x in BQs[A]]
                     oldBQ.sort()
                     
-                    medianBQ=oldBQ[len(oldBQ)//2]
+                    medianBQ = oldBQ[len(oldBQ)//2]
                     
                     n37 = sum(x[0]==37 for x in BQs[A])
+                    a = n_filtered[A]
+                    b = n_nonfiltered[A]
+                    c = n_filtered[ref]
+                    d = n_nonfiltered[ref]
+                    if a*d <= b*c:
+                        filter_allele_pval = 1.0
+                    else:
+                        filter_allele_pval = scipy.stats.fisher_exact([[a,b],[c,d]], alternative='greater')[1]
+                    filter_allele_table = f'[{a},{b},{c},{d}]'
+
+                    if filter_allele_pval < 0.05:
+                        if self.filter_variants:
+                            continue
+                        else:
+                            F_list.append("FilterBias")
+
+                    indel_reads = n_filtered['-']
 
                     if medianBQ < 20:
                         if self.filter_variants:
                             continue
                         else:
                             F_list.append("lowBQ")
+
+                    if min(n_pos[A], n_neg[A]) == 0 and max(n_pos[A], n_neg[A])>4:
+                        if self.filter_variants:
+                            continue
+                        else:
+                            F_list.append("StrandBias")
+
 
                     enddist = [x[2] for x in BQs[A]]
                     enddist_str = str(enddist)
@@ -387,13 +371,33 @@ class SomaticMutationCaller:
 
                     has_indel = [x[3] for x in BQs[A]]
                     has_clip = [x[4] for x in BQs[A]]
-                    NM = [x[5] for x in BQs[A]]
+                    NM_alt = [x[5] for x in BQs[A]]
+                    NM_ref = [x[5] for x in BQs[ref]]
                     #NM_str = str(NM)
-                    NM.sort()
-                    median_NM = NM[len(NM)//2]
+                    NM_alt.sort()
+                    NM_ref.sort()
+                    median_NM_alt = NM_alt[len(NM_alt)//2]
+                    min_NM_alt = min(NM_alt)
+
+                    if len(NM_ref)>0:
+                        median_NM_ref = NM_ref[len(NM_ref)//2]
+                        min_NM_ref = min(NM_ref)
+                        quartile_NM_ref = NM_ref[(len(NM_ref)*3)//4]
+                    else:
+                        median_NM_ref = 0
+                        min_NM_ref = 0
+                    
+                    #if min_NM_alt - median_NM_ref > self.max_NM_diff:
+                    if median_NM_alt - median_NM_ref > self.max_NM_diff:
+                        if self.filter_variants:
+                            continue
+                        else:
+                            F_list.append("manyAltMismatches")
+
                     frac_indel = sum(has_indel)/len(has_indel)
                     frac_clip = sum(has_clip)/len(has_clip)
 
+                    
                     n37_other = sum(x[0]==37 for alt in 'ACGT' for x in BQs[alt] if alt not in [ref,A])
                     #n37_other_nf = sum(x[0]==37 for alt in 'ACGT' for x in no_filter_BQs[alt] if alt not in [ref,A])
 
@@ -411,7 +415,7 @@ class SomaticMutationCaller:
 
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tpval={p_val:.3g};LR={LR:.3f};AF={AF:.3g};N={N};N_A={N_A};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)}', file=self.outfile)
                     #print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={no_filter_n_mismatch[A]};n_overlap={no_filter_n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};no_filter_n_other={n37_other_nf}{optional_info}', file=self.outfile)
-                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};NM={median_NM};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other}{optional_info}', file=self.outfile)
+                    print(f'{chrom}\t{ref_pos+1}\t.\t{ref}\t{A}\t{QUAL:.2f}\t{FILTER}\tAF={AF:.3g};N={N};N_A={N_A};N_A_37={n37};N_total={N_total};oldBQ={oldBQ_str};newBQ={newBQ};n_mismatch={n_mismatch[A]};n_overlap={n_double[A]};MQ={int(medianMQ)};alt_strand=[{n_pos[A]},{n_neg[A]}];enddist={enddist_str};median_alt_NM={median_NM_alt};median_ref_NM={median_NM_ref};min_alt_NM={min_NM_alt};min_ref_NM={min_NM_ref};quartile_NM_ref={quartile_NM_ref};frac_indel={frac_indel:.3g};frac_clip={frac_clip:.3g};kmer={kmer};n_other={n37_other};ref_medianMQ={ref_medianMQ};filter_vs_allele={filter_allele_table};filter_allele_pval={filter_allele_pval:.3g};indel_reads={indel_reads}{optional_info}', file=self.outfile)
 
         return n_calls
     
@@ -430,29 +434,17 @@ class SomaticMutationCaller:
         n_double = Counter()
         n_pos = Counter()
         n_neg = Counter()
-        events = {'A':[], 'C':[], 'G':[], 'T':[]}
-        double_combinations = set()
+        events = {'A':{}, 'C':{}, 'G':{}, 'T':{}}
+
+        n_filtered = Counter()
+        n_nonfiltered = Counter()
+
+        observed_BQs = set()
         R = ref
         for pileup_read in pileupcolumn.pileups:
-            # test for deletion at pileup
-            if pileup_read.is_del or pileup_read.is_refskip:
-                continue
-            #TODO: should consider what the right solution is if there is deletion at overlap
-
+           
             # fetch read information
             read = Read(pileup_read)
-
-            #if filter_reads and not read.is_good():
-            #    continue
-
-            # test if read is okay
-            if (
-                read.allel not in "ATGC"
-                or read.start is None
-                or read.end is None
-            ):
-                continue
-
 
             # Look for read partner
             if read.query_name in reads_mem:
@@ -463,46 +455,52 @@ class SomaticMutationCaller:
                 if read.allel == mem_read.allel:
                     X = read.allel
 
-                    if self.filter_reads:
-                        if (not read.is_good(self.min_enddist, self.max_mismatch)) and mem_read.is_good(self.min_enddist, self.max_mismatch):
-                            #considder mem_read single read.
-                            reads_mem[read.query_name] = mem_read
-                            continue
-                        elif (not mem_read.is_good(self.min_enddist, self.max_mismatch)) and read.is_good(self.min_enddist, self.max_mismatch):
-                            #considder read single read.
-                            reads_mem[read.query_name] = read
-                            continue
-                        elif (not read.is_good(self.min_enddist, self.max_mismatch)) and (not mem_read.is_good(self.min_enddist, self.max_mismatch)):
-                            continue
-
-                    if X == R:
-                        alts = [A for A in ['A','C','G','T'] if A!=R]
+                    if (not read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) and mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
+                        #considder mem_read single read.
+                        reads_mem[read.query_name] = mem_read
+                        continue
+                    elif (not mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) and read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
+                        #considder read single read.
+                        reads_mem[read.query_name] = read
+                        continue
+                    elif (not read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) and (not mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq)):
+                        #n_filtered += 1
+                        n_filtered[X] += 1
+                        continue
                     else:
-                        alts = [X]
+                        n_nonfiltered[X] += 1
+
+                    if X != R:
                         seen_alt.add(X)
                         n_pos[X] += 1
                         n_neg[X] += 1
+        
+                    #if not no_update:   
+                    n_double[X] += 1
 
-                    for A in alts:
-                        #if not no_update:   
-                        n_double[A] += 1
-
-                        read_MQ = (read.mapq + mem_read.mapq)/2
-                        #if overlap_type == "double":
+                    read_MQ = (read.mapq + mem_read.mapq)/2
                         
-                        if read.base_qual > mem_read.base_qual:
-                            read_BQ = (read.base_qual, mem_read.base_qual)
-                            BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
-                        else:
-                            read_BQ = (mem_read.base_qual, read.base_qual)
-                            BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
-                        double_combinations.add(read_BQ)
-                        enddist = max(read.enddist, mem_read.enddist)
-                        has_indel = max(read.has_indel, mem_read.has_indel)
-                        has_clip = max(read.has_clip, mem_read.has_clip)
-                        NM = max(read.NM, mem_read.NM)
-                        #(read.base_qual, mem_read.base_qual)
-                        events[A].append((X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair))
+                    if read.base_qual > mem_read.base_qual:
+                        read_BQ = (read.base_qual, mem_read.base_qual)
+                        BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
+                    else:
+                        read_BQ = (mem_read.base_qual, read.base_qual)
+                        BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
+
+                    observed_BQs.add(BQ_pair)
+                    enddist = max(read.enddist, mem_read.enddist)
+                    has_indel = max(read.has_indel, mem_read.has_indel)
+                    has_clip = max(read.has_clip, mem_read.has_clip)
+                    NM = max(read.NM, mem_read.NM)
+                    fragment_id = (min(read.start, mem_read.start), max(read.end, mem_read.end), X)
+                    assert read.start < read.end
+                    assert mem_read.start < mem_read.end
+                    if fragment_id not in events[X]:
+                        events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
+                    else:
+                        o_read_BQ = events[X][fragment_id][0]
+                        if o_read_BQ < read_BQ:
+                            events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair)
 
                 else: # Mismatch
                     #if not no_update:
@@ -526,25 +524,31 @@ class SomaticMutationCaller:
         # Handle reads without partner (ie. no overlap)
         for read in reads_mem.values():
             X = read.allel
-            if self.filter_reads and not read.is_good(self.min_enddist, self.max_mismatch):
+            if not read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
+                n_filtered[X] += 1
                 continue
-                
-            if X == R:
-                alts = [A for A in ['A','C','G','T'] if A!=R]
-            else:
+            else:    
+                n_nonfiltered[X] += 1
 
-                alts = [X]
+            if X != R:
                 seen_alt.add(X)
                 if read.is_reverse:
                     n_neg[X] += 1
                 else:
                     n_pos[X] += 1
             
-            for A in alts:
-                events[A].append((X, read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual)))
-        
+            observed_BQs.add(str(read.base_qual))
+            frag_id = (read.start, X)
+            if frag_id not in events[X]:
+                events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))
+            else:
+                o_read_BQ = events[X][frag_id][0]
+                if o_read_BQ < read.base_qual:
+                    events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual))                        
+
         if len(seen_alt) == 0:
-            return {}, {}, n_mismatch, n_double, n_pos, n_neg
+            return {}, {}, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered
+
 
         new_mut_probs = defaultdict(dict)
 
@@ -552,8 +556,8 @@ class SomaticMutationCaller:
         # I have to considder change to all bases to calculate stay types (X->X) correctly.
         relevant_bases = [ref] + list(seen_alt)
 
-        # calculate error probabilities for single reads:
-        for BQ in self.mut_probs:
+        # Do positional update of error rates:
+        for BQ in observed_BQs:
             new_mut_probs[BQ] = defaultdict(dict)
 
             for from_base in relevant_bases:
@@ -563,35 +567,10 @@ class SomaticMutationCaller:
                     if to_base == from_base:
                         continue
                     change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-                    alpha, beta = self.mut_probs[BQ][change_type][change_kmer]
-                    p_prior = alpha / (alpha + beta)
-                    new_p_prior = 0
-                    for other_BQ in self.mut_probs:
-                        other_alpha, other_beta = self.mut_probs[other_BQ][change_type][change_kmer]
-                        other_p_prior = other_alpha / (other_alpha + other_beta)
 
-                        if self.mean_type == "geometric":
-                            if self.BQ_freq_method == 'global':
-                                new_p_prior += self.BQ_freq[other_BQ] * math.sqrt(other_p_prior*p_prior)
-                            elif self.BQ_freq_method == 'global_by_type':
-                                new_p_prior += self.BQ_freq[other_BQ][change_type] * math.sqrt(other_p_prior*p_prior)
-                            elif self.BQ_freq_method == 'global_by_base':
-                                new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * math.sqrt(other_p_prior*p_prior)
-                        elif self.mean_type == "arithmetric":
-                            if self.BQ_freq_method == 'global':
-                                new_p_prior += self.BQ_freq[other_BQ] * ((other_p_prior+p_prior)/2)
-                            elif self.BQ_freq_method == 'global_by_type':
-                                new_p_prior += self.BQ_freq[other_BQ][change_type] * ((other_p_prior+p_prior)/2)
-                            elif self.BQ_freq_method == 'global_by_base':
-                                new_p_prior += self.BQ_freq[other_BQ][SW_type(to_base)] * ((other_p_prior+p_prior)/2)
-                        else:
-                            assert False, f'unknown mean_type parameter: {self.mean_type}'
-                    if self.mean_type == "geometric" and self.BQ_freq_method == 'global':
-                        new_p_prior += self.N_rate * math.sqrt(p_prior)
+                    p_prior = self.mut_probs[BQ][change_type][change_kmer]
 
-                    assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
-
-                    a = new_p_prior * self.prior_N
+                    a = p_prior * self.prior_N
                     b = self.prior_N - a
                     if self.no_update or from_base != ref:
                         p_posterior = a/(a + b)
@@ -604,69 +583,45 @@ class SomaticMutationCaller:
                     new_mut_probs[BQ][change_type][change_kmer] = p2phred(p_posterior)
 
                 assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
-                new_mut_probs[BQ][stay_type][stay_kmer] = p2phred(p_rest)
-    
-
-        # calculate error rates for double reads:
-        for BQ1, BQ2 in double_combinations:
-            new_mut_probs[(BQ1,BQ2)] = defaultdict(dict)
-
-            for from_base in relevant_bases:
-                p_rest = 1.0
-                stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer)
-                for to_base in ['A', 'C', 'G', 'T']:
-                    if to_base == from_base:
-                        continue
-                    change_type, change_kmer = mut_type(from_base, to_base, ref_kmer)
-
-                    alpha1, beta1 = self.mut_probs[BQ1][change_type][change_kmer]
-                    alpha2, beta2 = self.mut_probs[BQ2][change_type][change_kmer]
-                
-                    p_prior_1 = alpha1 / (alpha1 + beta1)
-                    p_prior_2 = alpha2 / (alpha2 + beta2)
-
-                    if self.mean_type == "geometric":
-                        new_p_prior = math.sqrt(p_prior_1 * p_prior_2)
-                    elif self.mean_type == "arithmetric":
-                        new_p_prior = ((p_prior_1 + p_prior_2)/2)
-                    else:
-                        assert False, f'unknown mean_type parameter: {self.mean_type}'
-
-                    assert 0.0 < new_p_prior < 1.0, f"prior error probability outside bounds: {new_p_prior}"
-
-                    a = new_p_prior * self.prior_N
-                    b = self.prior_N - a
-                    if self.no_update or from_base != ref:
-                        p_posterior = a/(a + b)
-                    else:
-                        p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                    p_rest -= p_posterior
-
-                    assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
-                    #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                    new_mut_probs[(BQ1,BQ2)][change_type][change_kmer] = p2phred(p_posterior)
-
-                assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
-                new_mut_probs[(BQ1,BQ2)][stay_type][stay_kmer] = p2phred(p_rest)    
+                new_mut_probs[BQ][stay_type][stay_kmer] = p2phred(p_rest)    
 
 
         posterior_base_probs = {}
-        BQs = {'A':[], 'C':[], 'G':[], 'T':[]}
+        BQs = {'A':[], 'C':[], 'G':[], 'T':[]}        
+
+
         for A in seen_alt:
             posterior_base_probs[A] = []
-            for X, read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair in events[A]:
-                muttype_from_A, kmer_from_A = mut_type(A, X, ref_kmer)
-                muttype_from_R, kmer_from_R = mut_type(R, X, ref_kmer)
-                posterior_from_A = new_mut_probs[read_BQ][muttype_from_A][kmer_from_A]
-                posterior_from_R = new_mut_probs[read_BQ][muttype_from_R][kmer_from_R]
+            for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ in events[A].values():
+                muttype_from_A, kmer_from_A = mut_type(A, A, ref_kmer)
+                muttype_from_R, kmer_from_R = mut_type(R, A, ref_kmer)
+                posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][kmer_from_A]
+                posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][kmer_from_R]
 
                 posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
-                if A==X:
-                    if type(read_BQ) == tuple:
-                        BQ1, BQ2 = read_BQ
-                        read_BQ = max(BQ1,BQ2)
-                    BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, BQ_pair))
-                
-        return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg
+                #if A==X:
+                if type(read_BQ) == tuple:
+                    BQ1, BQ2 = read_BQ
+                    read_BQ = max(BQ1,BQ2)
+                    str_BQ = f'{BQ1}/{BQ2}'                    
+                BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
+
+        for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ in events[R].values():
+            muttype_from_A, kmer_from_A = mut_type(A, R, ref_kmer)
+            muttype_from_R, kmer_from_R = mut_type(R, R, ref_kmer)
+            posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][kmer_from_A]
+            posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][kmer_from_R]
+            for A in seen_alt:
+                posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
+                #if A==X:
+            if type(read_BQ) == tuple:
+                BQ1, BQ2 = read_BQ
+                read_BQ = max(BQ1,BQ2)
+                str_BQ = f'{BQ1}/{BQ2}'
+            
+            BQs[R].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, str_BQ))
+        
+
+        return posterior_base_probs, BQs, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered
 
 

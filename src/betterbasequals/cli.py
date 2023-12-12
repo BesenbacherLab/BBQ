@@ -8,9 +8,8 @@ from betterbasequals.somatic_callers import SomaticMutationCaller
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from betterbasequals.kmerpapa_utils import get_kmerpapa
-
-# TODO: Possible input basequalities are hardcoded. Should make flexible solution.
-#VALID_BASEQUALS = [11,25,37]
+from betterbasequals.filter_calls import BBQFilter
+from math import sqrt
 
 def get_parser():
     """
@@ -51,13 +50,14 @@ def get_parser():
         help="Ignore bases in the first M or last M positions in the read")
     read_filter_parent.add_argument('--max_mismatch', type=int, default=1, metavar="M",
         help="Ignore alt reads if the read has more than M mismatches to the reference")
-    read_filter_parent.add_argument('--min_MQ', type=int, default=60,
+    read_filter_parent.add_argument('--min_MQ', type=int, default=40,
         help="Minimum base quality to considder")
+    read_filter_parent.add_argument('--exclude_bed', type=str,
+        help='Bed file with regions to exclude. Should be sorted by chrom (alphabetically) then pos (numrically).')
 
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
-    count_parent.add_argument("--output_file_good", type=argparse.FileType('w'))
-    count_parent.add_argument("--output_file_bad", type=argparse.FileType('w'))
+    count_parent.add_argument("--output_file_kmers", type=argparse.FileType('w'))
     count_parent.add_argument("--radius", type=int, default=3)
     count_parent.add_argument('--min_depth', type=int, default=1,
         help="mminimum depth at a site to be considered as training data")
@@ -68,6 +68,7 @@ def get_parser():
     count_parent.add_argument('--filter_max_depth', type=int, default=5000,
         help="maximum depth om filter_bam_file at a site to be considered as training data")
 
+
     # args for training models:    
     train_parent = argparse.ArgumentParser(add_help=False)
     train_parent.add_argument('--kmerpapa_method', type=str, default = "greedy",
@@ -77,6 +78,7 @@ def get_parser():
         help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
         choices=["bad_vs_good", "bad_vs_no"])
     train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
+    train_parent.add_argument("--output_file_EQ", type=argparse.FileType('w'))
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
         help='Number of folds to use when fitting hyperparameters in kmerpapa')
     train_parent.add_argument('-i', '--iterations', type=int, default=1, metavar='i',
@@ -84,6 +86,11 @@ def get_parser():
     train_parent.add_argument('--seed', type=int,
         help='seed for numpy.random')
     train_parent.add_argument('--same_good', action='store_true')
+    train_parent.add_argument('--subtract', action='store_true')
+    train_parent.add_argument('--estimated', type=str, default = 'single',
+                              choices = ['single', 'double'])
+    train_parent.add_argument('--mean_type', type=str, default = 'geometric',
+                              choices = ['geometric', 'harmonic'])
     train_parent.add_argument(
         '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10],
         help='Different pseudo count (alpha) values to test using cross validation')
@@ -113,7 +120,7 @@ def get_parser():
     call_parent.add_argument('--outfile', type=argparse.FileType('w'), default=sys.stdout,
         help="output file")
     call_parent.add_argument('--method', type=str,
-        choices=['LR', 'LR_with_MQ', 'poisson', 'BF'], default="LR",
+        choices=['LR', 'LR_with_MQ', 'maxLR_with_MQ', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior'], default="LR",
         help="Method used to calculate variant quality scores")
     call_parent.add_argument('--cutoff', type=float, default=None, metavar='Q',
         help="Only print variants with quality above Q.")
@@ -121,20 +128,17 @@ def get_parser():
         help="Weight (as sample size) of the kmer based prior on error rate.")
     call_parent.add_argument('--no_update',  action='store_true',
         help="Do not make bayesian update of error rate but use rate only estimated from kmers")
-    call_parent.add_argument('--N_rate', type=float, default=0.0,
-        help="Rate of N (non-call) bases")
     call_parent.add_argument('--min_BQ', type=int, default=1,
         help="Minimum base quality to considder")
     call_parent.add_argument('--filter_max_count', type=int, default=2,
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
     call_parent.add_argument("--pop_vcf", type=str,
         help='Population vcf with AF field.')
-    call_parent.add_argument('--mean_type', type=str,
-        choices=['arithmetric', 'geometric'], default="geometric",
-        help="How to calculate the mean error probabilty of two matching overlapping alleles")
-    call_parent.add_argument('--BQ_freq_method', type=str,
-        choices=['global', 'global_by_type', 'global_by_base'], default="global",
-        help="How to calculate the probability of seeing a specific BQ")
+    #call_parent.add_argument('--mean_type', type=str,
+    #    choices=['arithmetric', 'geometric'], default="geometric",
+    #    help="How to calculate the mean error probabilty of two matching overlapping alleles")
+    call_parent.add_argument('--max_NM_diff', type=int, default=1,
+        help="Maximum allowed difference in median number of mismatches for reads with alt alleles compared to reads with ref alleles")
 
     count_parser = subparsers.add_parser('count', 
         description='Count good and bad k-mers',
@@ -172,8 +176,8 @@ def get_parser():
         description = 'Train model to distinguish good and bad k-mers.',
         help = 'Train model to distinguish good and bad k-mers.',
         parents = [train_parent])
-    train_only_parser.add_argument("--input_file_good", type=argparse.FileType('r'))
-    train_only_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
+    train_only_parser.add_argument("--input_file_kmers", type=argparse.FileType('r'))
+    #train_only_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
 
     validate_only_parser = subparsers.add_parser('validate_only', 
         description = 'Print validation data.',
@@ -202,13 +206,25 @@ def get_parser():
     test_kmerpapa_parser = subparsers.add_parser('test_kmerpapa', 
         description = 'Apply a kmerpapa model to a set of kmer counts',
         help = 'Apply a kmerpapa model to a set of kmer counts')
-    test_kmerpapa_parser.add_argument("--input_file_good", type=argparse.FileType('r'))
-    test_kmerpapa_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
+    test_kmerpapa_parser.add_argument("--input_file_kmers", type=argparse.FileType('r'))
+    #test_kmerpapa_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
     test_kmerpapa_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
     test_kmerpapa_parser.add_argument('--correction_type', type=str, default = "bad_vs_no",
         help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
         choices=["bad_vs_good", "bad_vs_no"])
     test_kmerpapa_parser.add_argument('--same_good', action='store_true')
+
+    filter_calls_parser = subparsers.add_parser('filter_calls', 
+        description = 'Filter PASS calls based on coverage quantiles',
+        help = 'Filter PASS calls based on coverage quantiles')
+    filter_calls_parser.add_argument('--vcf_file', required=True,
+        help='input VCF file')
+    filter_calls_parser.add_argument('--outfile',  type=argparse.FileType('w'), default=sys.stdout,
+        help='output VCF file') 
+    filter_calls_parser.add_argument('--lower_q', type=float, default=0.05,
+        help='Lower quantile, PASS calls with coverage below this value will be filtered out') 
+    filter_calls_parser.add_argument('--upper_q', type=float, default=0.95,
+        help='Upper quantile, PASS calls with coverage above this value will be filtered out') 
     return parser
 
 
@@ -223,81 +239,186 @@ def run_get_good_and_bad_w_filter(opts):
             opts.min_MQ,
             radius = opts.radius,
             min_enddist = opts.min_enddist,
-            max_mismatch = opts.max_mismatch)
+            max_mismatch = opts.max_mismatch,
+            bed_file = opts.exclude_bed)
     
     if opts.chrom is None:
-        good_kmers, bad_kmers = \
-            counter.count_mutations_all_chroms()
+        event_kmers = counter.count_mutations_all_chroms()
     else:
-        good_kmers, bad_kmers = \
-            counter.count_mutations(opts.chrom, opts.start, opts.end)
-    print_good_and_bad(opts, good_kmers, bad_kmers)
+        event_kmers = counter.count_mutations(opts.chrom, opts.start, opts.end)
+    print_kmer_counts(opts, event_kmers)
+    
+    return event_kmers
     
     #change format of dicts to nested dicts
-    BQs_good = set(x[0] for x in good_kmers)
-    BQs_bad = set(x[0] for x in bad_kmers)
-    good_kmers2 = {}
-    bad_kmers2 = {}
-    for BQ in BQs_good | BQs_bad:
-        good_kmers2[BQ] = {}
-        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
-            good_kmers2[BQ][mtype] = defaultdict(int)
-        bad_kmers2[BQ] = {}
-        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-            bad_kmers2[BQ][mtype] = defaultdict(int)
-    for tup, count in good_kmers.items():
-        BQ, mtype, kmer = tup
-        good_kmers2[BQ][mtype][kmer] = count
-    for tup, count in bad_kmers.items():
-        BQ, mtype, kmer = tup
-        bad_kmers2[BQ][mtype][kmer] = count
-    return good_kmers2, bad_kmers2
+    # BQs = set(x[1] for x in event_kmers)
+    # good_kmers = {}
+    # bad_kmers = {}
+    # for BQ in BQs:
+    #     good_kmers[BQ] = {}
+    #     for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
+    #         good_kmers[BQ][mtype] = defaultdict(int)
+    #     bad_kmers[BQ] = {}
+    #     for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+    #         bad_kmers[BQ][mtype] = defaultdict(int)
+
+    # for tup, count in event_kmers.items():
+    #     event_type, BQ, mtype, kmer = tup
+    #     if event_type =='good':
+    #         good_kmers[BQ][mtype][kmer] = count
+    #     elif event_type == 'bad':
+    #         bad_kmers[BQ][mtype][kmer] = count
+    # return good_kmers, bad_kmers
 
 
-def run_get_kmerpapas(opts, good_kmers, bad_kmers):
+def run_get_kmerpapas(opts, event_kmers):
     if opts.verbosity > 0:
         eprint("Training kmer pattern partitions")
     kmer_papas = {}
-
-    for bqual in bad_kmers:
-        radius = len(next(iter(good_kmers[bqual]["C->T"].keys())))//2
+    BQs = list(set(x[1] for x in event_kmers if x[0]in ['good', 'bad']))
+    BQs.sort()
+    BQs = BQs[::-1]
+    radius = len(next(iter(event_kmers.keys()))[3])//2
+    for bqual in BQs:
+        BQ_pair = f'({bqual},{bqual})'
+        kmer_papas[BQ_pair] = {}
         kmer_papas[bqual] = {}
-        eprint(f'Handling base_qual: {bqual}')
-        for mtype in bad_kmers[bqual]:
-            if mtype[0] == mtype[-1]:
-                continue
-            eprint(f'Handling mutation type: {mtype}')
-            super_pattern = 'N'*radius + mtype[0] + 'N'*radius
-            eprint(mtype, end=" ")
-            if opts.correction_type == "bad_vs_good":
-                if opts.same_good:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][mtype][x])) for x in matches(super_pattern))
-                else:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][mtype][x])) for x in matches(super_pattern))
-            elif opts.correction_type == "bad_vs_no":
-                ref = mtype[0]
-                alt = mtype[-1]
-                notype = f'{ref}->{ref}'
-                other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
-                if opts.same_good:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[37][notype][x])) for x in matches(super_pattern))
-                else:
-                    contextD = dict((x, (bad_kmers[bqual][mtype][x], good_kmers[bqual][notype][x] + bad_kmers[bqual][other_type1][x] + bad_kmers[bqual][other_type2][x])) for x in matches(super_pattern))
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+            contextD = {}
+            ref = mtype[0]
+            alt = mtype[-1]
+            super_pattern = 'N'*radius + ref + 'N'*radius
+            notype = f'{ref}->{ref}'
+            other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
+            eprint(f'Handling base_qual: {BQ_pair}, muttype: {mtype}')
+            for kmer in matches(super_pattern):
+                n_errors = event_kmers[('bad', bqual, mtype, kmer)]
+                n_not_error = event_kmers[('good', bqual, notype, kmer)]
+                if not opts.same_good:
+                    n_not_error += event_kmers[('bad', bqual, other_type1, kmer)]
+                    n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
+                contextD[kmer] = (n_errors, n_not_error)
+
             kpp = get_kmerpapa(super_pattern, contextD, opts)
-            kmer_papas[bqual][mtype] = {}
+            if opts.estimated == "single":
+                estBQ = bqual
+            elif opts.estimated == "double":
+                estBQ = BQ_pair
+
+            kmer_papas[bqual][mtype] = {}    
+            kmer_papas[BQ_pair][mtype] = {}
+            
             for pat in kpp:
                 alpha, beta = kpp[pat]
-                if not opts.output_file_kmerpapa is None:
-                    print(bqual, mtype, pat, alpha, beta, file=opts.output_file_kmerpapa)
+                p_error = min(0.25, alpha / (alpha + beta))
                 if opts.verbosity > 1:
-                    eprint(bqual, mtype, pat, alpha, beta, -10*log10(alpha/(alpha+beta)))
-                for context in matches(pat):
-                    kmer_papas[bqual][mtype][context] = (alpha, beta)
+                    eprint(estBQ, mtype, pat, p_error, -10*log10(p_error))
+                for kmer in matches(pat):
+                    kmer_papas[estBQ][mtype][kmer] = p_error
+
+    # Estimate EQ correction for bases in overlaps
+    single_EQ = {}
+    double_EQ = {}
+    for BQ in BQs:
+        single_EQ[BQ] = {}
+        double_EQ[BQ] = {}
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+            ref = mtype[0]
+            alt = mtype[-1]
+            super_pattern = 'N'*radius + ref + 'N'*radius
+            notype = f'{ref}->{ref}'
+            other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
+            BQ_pair = f'({BQ},{BQ})'
+            single_mut = 0
+            single_nomut = 0
+            double_mut = 0
+            double_nomut = 0
+            if opts.estimated == 'single':
+                BQest = BQ
+            elif opts.estimated == 'double':
+                BQest = BQ_pair
+
+            for kmer in kmer_papas[BQest][mtype]:
+                single_mut += event_kmers[('singleton', BQ, mtype, kmer)]
+                single_nomut += event_kmers[('singleton', BQ, notype, kmer)]
+                double_mut += event_kmers[('good_tuple', BQ_pair, mtype, kmer)]
+                double_nomut += event_kmers[('good_tuple', BQ_pair, notype, kmer)]
+                #TODO: add other muttypes from good_tuple and single to nomut?
+                double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
+                double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
+                double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
+            single_EQ[BQ][mtype] = (single_mut+0.1) / (single_mut + single_nomut + 0.2)
+            double_EQ[BQ][mtype] = (double_mut+0.1) / (double_mut + double_nomut + 0.2)
+           
+           # rel_EQ = single_EQ / double_EQ
+
+            #if not opts.output_file_EQ is None:
+            #    print(BQ, mtype, single_mut, single_nomut, single_EQ, double_mut, double_nomut, double_EQ, rel_EQ, file = opts.output_file_EQ)
+
+    #if not opts.output_file_EQ is None:
+    #    opts.output_file_EQ.close()        
+
+    max_BQ = max(BQs)
+
+    # apply EQ correction
+    for BQ in BQs:
+        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+            BQ_pair = f'({BQ},{BQ})'
+            if (opts.subtract and
+                (BQ < max_BQ) and 
+                (single_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8) and 
+                (double_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8)):
+                subtract = double_EQ[max_BQ][mtype]
+            else:
+                subtract = 0.0
+
+            rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
+
+            if not opts.output_file_EQ is None:
+                print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
+
+            if opts.estimated == "single":
+                kmer_papas[BQ_pair][mtype] = {}
+                for kmer in kmer_papas[BQ][mtype]:
+                    kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
+            elif opts.estimated == "double":
+                kmer_papas[BQ][mtype] = {}
+                for kmer in kmer_papas[BQ_pair][mtype]:
+                    kmer_papas[BQ][mtype][kmer] = min(kmer_papas[BQ_pair][mtype][kmer] * rel_EQ, 0.25)
     
+    if not opts.output_file_EQ is None:
+        opts.output_file_EQ.close() 
+
+    # Estimate error rates for pairs of different BQs:
+    for i in range(len(BQs)):
+        for j in range(i+1, len(BQs)):
+            BQ1 = BQs[i]
+            BQ2 = BQs[j]
+            BQ_pair = f'({BQ1},{BQ2})'
+            BQ1_pair = f'({BQ1},{BQ1})'
+            BQ2_pair = f'({BQ2},{BQ2})'
+            kmer_papas[BQ_pair] = {}
+            for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+                kmer_papas[BQ_pair][mtype] = {}
+                for kmer in kmer_papas[BQ1_pair][mtype]:
+                    if opts.mean_type == 'geometric':
+                        kmer_papas[BQ_pair][mtype][kmer] = \
+                            sqrt(kmer_papas[BQ1_pair][mtype][kmer]*kmer_papas[BQ2_pair][mtype][kmer])
+                    elif opts.mean_type == 'harmonic':
+                        kmer_papas[BQ_pair][mtype][kmer] = \
+                            1.0/(((1.0/kmer_papas[BQ1_pair][mtype][kmer]) + (1.0/kmer_papas[BQ2_pair][mtype][kmer]))/2)
+
+                    #TODO: Should we try harmonic mean?
+
     if not opts.output_file_kmerpapa is None:
+        for BQ in kmer_papas:
+            for mtype in kmer_papas[BQ]:
+                for kmer in kmer_papas[BQ][mtype]:
+                    print(BQ, mtype, kmer, kmer_papas[BQ][mtype][kmer], file=opts.output_file_kmerpapa)
         opts.output_file_kmerpapa.close()
     
     return kmer_papas
+
 
 def phred_scale_kmerpapas(kmer_papas):
     for bqual in kmer_papas:
@@ -375,15 +496,14 @@ def run_call(opts, kmer_papas):
             opts.cutoff,
             opts.prior_N,
             opts.no_update,
-            opts.N_rate,
             opts.min_MQ,
             opts.min_BQ,
             opts.filter_max_count,
             opts.pop_vcf,
             opts.min_enddist,
             opts.max_mismatch,
-            opts.mean_type,
-            opts.BQ_freq_method,
+            opts.max_NM_diff,
+            bed_file = opts.exclude_bed,
         )
     if opts.chrom is None:
         n_calls = caller.call_all_chroms()
@@ -400,7 +520,7 @@ def run_call(opts, kmer_papas):
 def get_phred(tup):
     alpha, beta = tup
     return -10*log10(alpha /(alpha+beta))
- 
+
 def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
     for bqual in kmer_papas:
         for mtype in kmer_papas[bqual]:
@@ -432,6 +552,23 @@ def run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers):
                 print(bqual, mtype, pat, get_phred(kmer_papas[bqual][mtype][pat]), n_bad, n_good, phred)
 
 
+def run_calls_filter(opts):
+    if opts.verbosity > 0:
+        eprint(f'Filtering PASS calls based on {opts.lower_q*100}% and {opts.upper_q*100}% coverage quantiles.')
+
+    filter = \
+        BBQFilter(
+            opts.vcf_file, 
+            opts.outfile, 
+            opts.lower_q,
+            opts.upper_q
+            )
+    n_filtered = filter.filter_BBQ()
+    
+    if opts.verbosity > 0:
+        eprint(f"Removed {n_filtered} PASS calls.")
+
+
 def main(args = None):
     """
     Run the main program.
@@ -454,18 +591,20 @@ def main(args = None):
         parser.print_help(sys.stderr)
         return 1
 
-    if not opts.command in ['train_only', 'validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
-        good_kmers, bad_kmers = run_get_good_and_bad_w_filter(opts)
+    if not opts.command in ['train_only', 'validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa', 'filter_calls']:
+        event_kmers = run_get_good_and_bad_w_filter(opts)
     elif opts.command in ['train_only', 'test_kmerpapa']:
-        good_kmers, bad_kmers = read_kmers(opts)
+        event_kmers = read_kmers(opts)
 
     if opts.command == 'count':
         return 0
 
-    if not opts.command in ['validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa']:
-        kmer_papas = run_get_kmerpapas(opts, good_kmers, bad_kmers)
+    if not opts.command in ['validate_only', 'list_validate_only', 'call_only', 'adjust_only', 'test_kmerpapa', 'filter_calls']:
+        kmer_papas = run_get_kmerpapas(opts, event_kmers)
     elif opts.command in "test_kmerpapa":
         kmer_papas = read_kmer_papas_for_test(opts)
+    elif opts.command in "filter_calls":
+        pass
     else:
         eprint("Reading kmer pattern partitions")
         kmer_papas = read_kmer_papas(opts)
@@ -481,8 +620,10 @@ def main(args = None):
         run_call(opts, kmer_papas)
     elif opts.command in ['adjust', 'adjust_only']:
         run_adjust(opts, kmer_papas)
-    elif opts.command == 'test_kmerpapa':
-        run_test_kmerpapas(opts, kmer_papas, good_kmers, bad_kmers)
+    #elif opts.command == 'test_kmerpapa':
+    #    run_test_kmerpapas(opts, kmer_papas, event_kmers)
+    elif opts.command == 'filter_calls':
+        run_calls_filter(opts)
     else:
         eprint("Unknown command: {opts.command}")
         return 1
