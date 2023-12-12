@@ -90,7 +90,7 @@ def get_parser():
     train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
     train_parent.add_argument('--mean_type', type=str, default = 'geometric',
-                              choices = ['geomtric', 'harmonic'])
+                              choices = ['geometric', 'harmonic'])
     train_parent.add_argument(
         '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10],
         help='Different pseudo count (alpha) values to test using cross validation')
