@@ -134,9 +134,9 @@ def get_parser():
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
     call_parent.add_argument("--pop_vcf", type=str,
         help='Population vcf with AF field.')
-    call_parent.add_argument('--mean_type', type=str,
-        choices=['arithmetric', 'geometric'], default="geometric",
-        help="How to calculate the mean error probabilty of two matching overlapping alleles")
+    #call_parent.add_argument('--mean_type', type=str,
+    #    choices=['arithmetric', 'geometric'], default="geometric",
+    #    help="How to calculate the mean error probabilty of two matching overlapping alleles")
     call_parent.add_argument('--max_NM_diff', type=int, default=1,
         help="Maximum allowed difference in median number of mismatches for reads with alt alleles compared to reads with ref alleles")
 
