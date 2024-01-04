@@ -396,10 +396,10 @@ def run_get_kmerpapas(opts, event_kmers):
             else:
                 subtract = 0.0
 
-            rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
-
-            if not opts.output_file_EQ is None and not opts.EQ_pat:
-                print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
+            if not opts.EQ_pat:
+                rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
+                if not opts.output_file_EQ is None:
+                    print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
 
             if opts.estimated == "single":
                 kmer_papas[BQ_pair][mtype] = {}
