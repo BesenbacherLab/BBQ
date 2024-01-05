@@ -88,6 +88,8 @@ def get_parser():
     train_parent.add_argument('--same_good', action='store_true')
     train_parent.add_argument('--subtract', action='store_true')
     train_parent.add_argument('--EQ_pat', action='store_true')
+    train_parent.add_argument('--min1EQ', action='store_true')
+    train_parent.add_argument('--EQkmerpapa', action='store_true')
     train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
     train_parent.add_argument('--mean_type', type=str, default = 'geometric',
@@ -406,6 +408,8 @@ def run_get_kmerpapas(opts, event_kmers):
                 if opts.EQ_pat:
                     for pat in single_EQ[BQ][mtype]:
                         rel_EQ = single_EQ[BQ][mtype][pat] / double_EQ[BQ][mtype][pat]
+                        if opts.min1EQ:
+                            rel_EQ = max(1.0, rel_EQ)
                         if not opts.output_file_EQ is None:
                             print(BQ, mtype, pat, single_EQ[BQ][mtype][pat], double_EQ[BQ][mtype][pat], subtract, rel_EQ, file = opts.output_file_EQ)
                         for kmer in matches(pat):
