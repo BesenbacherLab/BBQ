@@ -1,6 +1,6 @@
 import py2bit
 from scipy.optimize import minimize_scalar
-from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read, change_mtypes, SW_type, SortedBed
+from betterbasequals.utils import eprint, zip_pileups_single_chrom, open_bam_w_index, phred2p, p2phred, VcfAfReader, mut_type, Read, change_mtypes, SW_type, SortedBed, first
 from collections import Counter, defaultdict
 import scipy.stats
 import math
@@ -119,7 +119,7 @@ class SomaticMutationCaller:
         min_base_qual_filter = 20, 
         min_depth = 1, 
         max_depth = 1000000,
-        radius = 3, 
+        #radius = 3, 
         prefix = "",
         bed_file = None,
     ):
@@ -157,7 +157,7 @@ class SomaticMutationCaller:
         self.min_base_qual_filter = min_base_qual_filter
         self.min_depth = min_depth
         self.max_depth = max_depth
-        self.radius = radius
+        self.radius = len(first(first(first(kmer_papa.values()).values()).keys()))//2
         self.prefix = prefix
         self.filter_variants = False
 
