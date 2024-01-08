@@ -347,7 +347,7 @@ def run_get_kmerpapas(opts, event_kmers):
             if opts.EQ_pat:
                 single_EQ[BQ][mtype] = {}
                 double_EQ[BQ][mtype] = {}
-                for pat in kmer_patterns[bqual][mtype]:
+                for pat in kmer_patterns[BQ][mtype]:
                     single_mut = 0
                     single_nomut = 0
                     double_mut = 0
