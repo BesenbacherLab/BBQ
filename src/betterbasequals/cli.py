@@ -525,6 +525,8 @@ def run_adjust(opts, kmer_papas):
 def run_call(opts, kmer_papas):
     if opts.verbosity > 0:
         eprint("Calling somatic variants")
+    if opts.prior_N < 0:
+        opts.no_update = True
     caller = \
         SomaticMutationCaller(
             opts.bam_file,
