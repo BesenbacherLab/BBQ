@@ -58,7 +58,7 @@ for line in sys.stdin:
             if kmer2pattern is None:
                 counter[(muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'])] += 1
             else:
-                pattern = kmer2pattern[oldBQ][muttype][kmer]
+                pattern = kmer2pattern[max_oldBQ][muttype][kmer]
                 counter[(muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], pattern)] += 1
 
 columns = [
