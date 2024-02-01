@@ -370,14 +370,14 @@ def run_get_kmerpapas(opts, event_kmers):
                         double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
                         double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
                         double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
-                    total_single_mut[BQ][mtype] += single_mut
-                    total_single_nomut[BQ][mtype] += single_nomut
-                    total_double_mut[BQ][mtype] += double_mut
-                    total_double_nomut[BQ][mtype] += double_nomut
+                    total_single_mut += single_mut
+                    total_single_nomut += single_nomut
+                    total_double_mut += double_mut
+                    total_double_nomut += double_nomut
                     single_EQ[BQ][mtype][pat] = (single_mut, single_nomut)#(single_mut+0.1) / (single_mut + single_nomut + 0.2)
                     double_EQ[BQ][mtype][pat] = (double_mut, double_nomut)#(double_mut+0.1) / (double_mut + double_nomut + 0.2)
-                avg_single_EQ[BQ][mtype] = (total_single_mut[BQ][mtype] + 0.1) / (total_single_mut[BQ][mtype] + total_single_nomut[BQ][mtype] + 0.2)
-                avg_double_EQ[BQ][mtype] = (total_double_mut[BQ][mtype] + 0.1) / (total_double_mut[BQ][mtype] + total_double_nomut[BQ][mtype] + 0.2)
+                avg_single_EQ[BQ][mtype] = (total_single_mut + 0.1) / (total_single_mut + total_single_nomut + 0.2)
+                avg_double_EQ[BQ][mtype] = (total_double_mut + 0.1) / (total_double_mut + total_double_nomut + 0.2)
 
             else:
                 for kmer in kmer_papas[BQest][mtype]:
