@@ -89,7 +89,6 @@ def get_parser():
     train_parent.add_argument('--subtract', action='store_true')
     train_parent.add_argument('--EQ_pat', action='store_true')
     train_parent.add_argument('--min1EQ', action='store_true')
-    train_parent.add_argument('--EQkmerpapa', action='store_true')
     train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
     train_parent.add_argument('--mean_type', type=str, default = 'geometric',
@@ -325,9 +324,13 @@ def run_get_kmerpapas(opts, event_kmers):
     # Estimate EQ correction for bases in overlaps
     single_EQ = {}
     double_EQ = {}
+    avg_single_EQ = {}
+    avg_double_EQ = {}
     for BQ in BQs:
         single_EQ[BQ] = {}
         double_EQ[BQ] = {}
+        avg_single_EQ[BQ] = {}
+        avg_double_EQ[BQ] = {}
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             ref = mtype[0]
             alt = mtype[-1]
@@ -345,8 +348,14 @@ def run_get_kmerpapas(opts, event_kmers):
                 BQest = BQ_pair
             
             if opts.EQ_pat:
+                total_single_mut = 0
+                total_single_nomut = 0
+                total_double_mut = 0
+                total_double_nomut = 0
                 single_EQ[BQ][mtype] = {}
                 double_EQ[BQ][mtype] = {}
+                avg_single_EQ[BQ][mtype] = {}
+                avg_double_EQ[BQ][mtype] = {}
                 for pat in kmer_patterns[BQ][mtype]:
                     single_mut = 0
                     single_nomut = 0
@@ -361,8 +370,15 @@ def run_get_kmerpapas(opts, event_kmers):
                         double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
                         double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
                         double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
-                    single_EQ[BQ][mtype][pat] = (single_mut+0.1) / (single_mut + single_nomut + 0.2)
-                    double_EQ[BQ][mtype][pat] = (double_mut+0.1) / (double_mut + double_nomut + 0.2)
+                    total_single_mut[BQ][mtype] += single_mut
+                    total_single_nomut[BQ][mtype] += single_nomut
+                    total_double_mut[BQ][mtype] += double_mut
+                    total_double_nomut[BQ][mtype] += double_nomut
+                    single_EQ[BQ][mtype][pat] = (single_mut, single_nomut)#(single_mut+0.1) / (single_mut + single_nomut + 0.2)
+                    double_EQ[BQ][mtype][pat] = (double_mut, double_nomut)#(double_mut+0.1) / (double_mut + double_nomut + 0.2)
+                avg_single_EQ[BQ][mtype] = (total_single_mut[BQ][mtype] + 0.1) / (total_single_mut[BQ][mtype] + total_single_nomut[BQ][mtype] + 0.2)
+                avg_double_EQ[BQ][mtype] = (total_double_mut[BQ][mtype] + 0.1) / (total_double_mut[BQ][mtype] + total_double_nomut[BQ][mtype] + 0.2)
+
             else:
                 for kmer in kmer_papas[BQest][mtype]:
                     single_mut += event_kmers[('singleton', BQ, mtype, kmer)]
@@ -385,7 +401,7 @@ def run_get_kmerpapas(opts, event_kmers):
     #    opts.output_file_EQ.close()        
 
     max_BQ = max(BQs)
-
+    alpha = 5 # pseudo count
     # apply EQ correction
     for BQ in BQs:
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
@@ -407,11 +423,17 @@ def run_get_kmerpapas(opts, event_kmers):
                 kmer_papas[BQ_pair][mtype] = {}
                 if opts.EQ_pat:
                     for pat in single_EQ[BQ][mtype]:
-                        rel_EQ = single_EQ[BQ][mtype][pat] / double_EQ[BQ][mtype][pat]
+                        single_mut, single_nomut = single_EQ[BQ][mtype][pat]
+                        double_mut, double_nomut =  double_EQ[BQ][mtype][pat]    
+                        beta_single = (alpha*(1.0-avg_single_EQ[BQ][mtype]))/avg_single_EQ[BQ][mtype]
+                        beta_double = (alpha*(1.0-avg_double_EQ[BQ][mtype]))/avg_double_EQ[BQ][mtype]
+                        single_EQ = (single_mut + alpha) / (single_mut + single_nomut + alpha +beta_single)
+                        double_EQ = (double_mut + alpha) / (double_mut + double_nomut + alpha +beta_double)
+                        rel_EQ = single_EQ / double_EQ
                         if opts.min1EQ:
                             rel_EQ = max(1.0, rel_EQ)
                         if not opts.output_file_EQ is None:
-                            print(BQ, mtype, pat, single_EQ[BQ][mtype][pat], double_EQ[BQ][mtype][pat], subtract, rel_EQ, file = opts.output_file_EQ)
+                            print(BQ, mtype, pat, single_mut, single_nomut, double_mut, double_nomut, single_EQ, double_EQ, subtract, rel_EQ, file = opts.output_file_EQ)
                         for kmer in matches(pat):
                             kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
                 
