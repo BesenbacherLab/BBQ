@@ -43,6 +43,9 @@ def SW_type(base):
     else:
         return base
 
+def first(the_iterable):
+    for x in the_iterable:
+        return x
 
 def get_average_coverage(bamfile):
     """Quickly calculates the average coverage of a WGS bamfile using the bam index.
