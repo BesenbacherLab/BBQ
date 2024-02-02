@@ -427,13 +427,13 @@ def run_get_kmerpapas(opts, event_kmers):
                         double_mut, double_nomut =  double_EQ[BQ][mtype][pat]    
                         beta_single = (alpha*(1.0-avg_single_EQ[BQ][mtype]))/avg_single_EQ[BQ][mtype]
                         beta_double = (alpha*(1.0-avg_double_EQ[BQ][mtype]))/avg_double_EQ[BQ][mtype]
-                        single_EQ = (single_mut + alpha) / (single_mut + single_nomut + alpha +beta_single)
-                        double_EQ = (double_mut + alpha) / (double_mut + double_nomut + alpha +beta_double)
-                        rel_EQ = single_EQ / double_EQ
+                        s_EQ = (single_mut + alpha) / (single_mut + single_nomut + alpha +beta_single)
+                        d_EQ = (double_mut + alpha) / (double_mut + double_nomut + alpha +beta_double)
+                        rel_EQ = s_EQ / d_EQ
                         if opts.min1EQ:
                             rel_EQ = max(1.0, rel_EQ)
                         if not opts.output_file_EQ is None:
-                            print(BQ, mtype, pat, single_mut, single_nomut, double_mut, double_nomut, single_EQ, double_EQ, subtract, rel_EQ, file = opts.output_file_EQ)
+                            print(BQ, mtype, pat, single_mut, single_nomut, double_mut, double_nomut, s_EQ, d_EQ, subtract, rel_EQ, file = opts.output_file_EQ)
                         for kmer in matches(pat):
                             kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
                 
