@@ -1,9 +1,38 @@
 import sys
 from collections import Counter
-from betterbasequals.utils import matches, reverse_complement
 import argparse
 
+complement = str.maketrans("ATCGN", "TAGCN")
+
+def reverse_complement(s):
+    return s.translate(complement)[::-1]
+
 ostrand = {'A':'T', 'C':'G', 'G':'C', 'T':'A'}
+
+code = {'A':['A'],
+        'C':['C'],
+        'G':['G'],
+        'T':['T'],
+        'R':['A', 'G'],
+        'Y':['C', 'T'],
+        'S':['G', 'C'],
+        'W':['A', 'T'],
+        'K':['G', 'T'],
+        'M':['A', 'C'],
+        'B':['C', 'G', 'T'],
+        'D':['A', 'G', 'T'],
+        'H':['A', 'C', 'T'],
+        'V':['A', 'C', 'G'],
+        'N':['A', 'C', 'G', 'T']}
+
+def matches(pattern):
+    if len(pattern) == 0:
+        yield ''
+    else:
+        for y in matches(pattern[1:]):
+            for x in code[pattern[0]]:
+                yield x+y
+
 
 def list_vals(x):
     return x[1:-1].split(',')
@@ -21,7 +50,10 @@ if not args.EQ_file is None:
     kmer2pattern = {}
     pattern2correction = {}
     for line in args.EQ_file:
-        BQ, muttype, pattern, single_rate, double_rat, subtract, correction = line.split()
+        L = line.split()
+        BQ = L[0]
+        muttype = L[1]
+        pattern = L[2]
         if BQ not in kmer2pattern:
             kmer2pattern[BQ] = {}
         if muttype not in kmer2pattern[BQ]:
