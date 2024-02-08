@@ -79,6 +79,7 @@ def get_parser():
         choices=["bad_vs_good", "bad_vs_no"])
     train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
     train_parent.add_argument("--output_file_EQ", type=argparse.FileType('w'))
+    train_parent.add_argument("--CVfile_prefix", type=str)
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
         help='Number of folds to use when fitting hyperparameters in kmerpapa')
     train_parent.add_argument('-i', '--iterations', type=int, default=1, metavar='i',
@@ -303,7 +304,7 @@ def run_get_kmerpapas(opts, event_kmers):
                     n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
                 contextD[kmer] = (n_errors, n_not_error)
 
-            kpp = get_kmerpapa(super_pattern, contextD, opts)
+            kpp = get_kmerpapa(super_pattern, contextD, f'{mtype}_{bqual}', opts)
             if opts.estimated == "single":
                 estBQ = bqual
             elif opts.estimated == "double":

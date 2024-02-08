@@ -7,7 +7,7 @@ from math import log10
 from importlib import reload
 import argparse
 
-def get_kmerpapa(super_pattern, contextD, opts):
+def get_kmerpapa(super_pattern, contextD, name, opts):
     n_bad = 0
     n_good = 0
     for x,y in contextD.values():
@@ -39,7 +39,10 @@ def get_kmerpapa(super_pattern, contextD, opts):
         args.nfolds = opts.nfolds
         args.iterations = opts.iterations
         args.verbosity = opts.verbosity
-        args.CVfile = None
+        if opts.CVfile_prefix is None:
+            args.CVfile = None
+        else:
+            args.CVfile = f'{opts.CVfile_prefix}_{name}.txt'
         args.seed = opts.seed
         pseudo_counts = opts.pseudo_counts
         penalty_values = opts.penalty_values
