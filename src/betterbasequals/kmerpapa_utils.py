@@ -42,7 +42,7 @@ def get_kmerpapa(super_pattern, contextD, name, opts):
         if opts.CVfile_prefix is None:
             args.CVfile = None
         else:
-            cvfile = open(f'{opts.CVfile_prefix}_{name}.txt')
+            cvfile = open(f'{opts.CVfile_prefix}_{name}.txt', 'w')
             args.CVfile = cvfile
         args.seed = opts.seed
         pseudo_counts = opts.pseudo_counts
