@@ -42,7 +42,8 @@ def get_kmerpapa(super_pattern, contextD, name, opts):
         if opts.CVfile_prefix is None:
             args.CVfile = None
         else:
-            args.CVfile = f'{opts.CVfile_prefix}_{name}.txt'
+            cvfile = open(f'{opts.CVfile_prefix}_{name}.txt')
+            args.CVfile = cvfile
         args.seed = opts.seed
         pseudo_counts = opts.pseudo_counts
         penalty_values = opts.penalty_values
@@ -53,6 +54,8 @@ def get_kmerpapa(super_pattern, contextD, name, opts):
         best_alpha, best_penalty, test_score = bottum_up_array_penalty_plus_pseudo_CV.pattern_partition_bottom_up(super_pattern, contextD, pseudo_counts, args, n_bad, n_good, penalty_values)
         best_beta = (best_alpha*(1.0-my))/my
         best_score, M, U, names = bottum_up_array_w_numba.pattern_partition_bottom_up(super_pattern, contextD, best_alpha, best_beta, best_penalty, opts, n_bad, n_good, index_mut=0)
+        if not args.CVfile is None:
+            cvfile.close()
     if opts.verbosity > 0:
         eprint(f' .  best_penalty = {best_penalty}, best_alpha={best_alpha}, n_patterns={len(names)}')
     counts = []
