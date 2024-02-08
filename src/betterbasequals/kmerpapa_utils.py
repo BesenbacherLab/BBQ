@@ -51,7 +51,11 @@ def get_kmerpapa(super_pattern, contextD, name, opts):
         #If if remove the global variables in kmerpapa I can skip these lines.
         reload(bottum_up_array_penalty_plus_pseudo_CV)
         reload(bottum_up_array_w_numba)
-        best_alpha, best_penalty, test_score = bottum_up_array_penalty_plus_pseudo_CV.pattern_partition_bottom_up(super_pattern, contextD, pseudo_counts, args, n_bad, n_good, penalty_values)
+        if len(pseudo_counts) == 1 and len(penalty_values) == 1:
+            best_alpha = pseudo_counts[0]
+            best_penalty = penalty_values[0]
+        else:
+            best_alpha, best_penalty, test_score = bottum_up_array_penalty_plus_pseudo_CV.pattern_partition_bottom_up(super_pattern, contextD, pseudo_counts, args, n_bad, n_good, penalty_values)
         best_beta = (best_alpha*(1.0-my))/my
         best_score, M, U, names = bottum_up_array_w_numba.pattern_partition_bottom_up(super_pattern, contextD, best_alpha, best_beta, best_penalty, opts, n_bad, n_good, index_mut=0)
         if not args.CVfile is None:
