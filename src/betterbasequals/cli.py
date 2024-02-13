@@ -79,6 +79,7 @@ def get_parser():
         choices=["bad_vs_good", "bad_vs_no"])
     train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
     train_parent.add_argument("--output_file_EQ", type=argparse.FileType('w'))
+    train_parent.add_argument("--CVfile_prefix", type=str)
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
         help='Number of folds to use when fitting hyperparameters in kmerpapa')
     train_parent.add_argument('-i', '--iterations', type=int, default=1, metavar='i',
@@ -88,6 +89,7 @@ def get_parser():
     train_parent.add_argument('--same_good', action='store_true')
     train_parent.add_argument('--subtract', action='store_true')
     train_parent.add_argument('--EQ_pat', action='store_true')
+    train_parent.add_argument('--EQ_pat_alpha', type=float, default=2)
     train_parent.add_argument('--min1EQ', action='store_true')
     train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
@@ -303,7 +305,7 @@ def run_get_kmerpapas(opts, event_kmers):
                     n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
                 contextD[kmer] = (n_errors, n_not_error)
 
-            kpp = get_kmerpapa(super_pattern, contextD, opts)
+            kpp = get_kmerpapa(super_pattern, contextD, f'{mtype}_{bqual}', opts)
             if opts.estimated == "single":
                 estBQ = bqual
             elif opts.estimated == "double":
@@ -312,7 +314,7 @@ def run_get_kmerpapas(opts, event_kmers):
             kmer_papas[bqual][mtype] = {}    
             kmer_papas[BQ_pair][mtype] = {}
             
-            kmer_patterns[bqual][mtype] = list(kpp.keys())
+            kmer_patterns[bqual][mtype] = kpp#list(kpp.keys())
             for pat in kpp:
                 alpha, beta = kpp[pat]
                 p_error = min(0.25, alpha / (alpha + beta))
@@ -400,8 +402,14 @@ def run_get_kmerpapas(opts, event_kmers):
     #if not opts.output_file_EQ is None:
     #    opts.output_file_EQ.close()        
 
+    if not opts.output_file_EQ is None:
+        if opts.EQ_pat:
+            print('BQ mutationtype pattern kmerpapa_alpha kmepapa_beta kmerpapa_rate single_mut single_nomut double_mut double_nomut single_EQ double_EQ subtract relative_EQ', file = opts.output_file_EQ)
+
+
+
     max_BQ = max(BQs)
-    alpha = 5 # pseudo count
+    alpha = opts.EQ_pat_alpha #5 # pseudo count
     # apply EQ correction
     for BQ in BQs:
         for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
@@ -433,7 +441,8 @@ def run_get_kmerpapas(opts, event_kmers):
                         if opts.min1EQ:
                             rel_EQ = max(1.0, rel_EQ)
                         if not opts.output_file_EQ is None:
-                            print(BQ, mtype, pat, single_mut, single_nomut, double_mut, double_nomut, s_EQ, d_EQ, subtract, rel_EQ, file = opts.output_file_EQ)
+                            kmp_alpha, kmp_beta = kmer_patterns[BQ][mtype][pat]
+                            print(BQ, mtype, pat, kmp_alpha, kmp_beta, kmp_alpha/(kmp_alpha+kmp_beta), single_mut, single_nomut, double_mut, double_nomut, s_EQ, d_EQ, subtract, rel_EQ, file = opts.output_file_EQ)
                         for kmer in matches(pat):
                             kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
                 

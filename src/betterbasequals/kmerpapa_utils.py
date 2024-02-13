@@ -7,7 +7,7 @@ from math import log10
 from importlib import reload
 import argparse
 
-def get_kmerpapa(super_pattern, contextD, opts):
+def get_kmerpapa(super_pattern, contextD, name, opts):
     n_bad = 0
     n_good = 0
     for x,y in contextD.values():
@@ -29,7 +29,7 @@ def get_kmerpapa(super_pattern, contextD, opts):
         return {super_pattern: (0.01+n_bad, 1+n_good)}
         #return {super_pattern: -10*log10((n_bad)/(0.5+n_good +n_bad))}
     if opts.kmerpapa_method == 'greedy':
-        CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
+        CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed, min_pseudo=0.5, min_penalty=1.0)
         best_alpha, best_penalty, test_score = CV.get_best_a_c()
         #eprint(test_score)
         best_beta = (best_alpha*(1.0-my))/my
@@ -39,7 +39,11 @@ def get_kmerpapa(super_pattern, contextD, opts):
         args.nfolds = opts.nfolds
         args.iterations = opts.iterations
         args.verbosity = opts.verbosity
-        args.CVfile = None
+        if opts.CVfile_prefix is None:
+            args.CVfile = None
+        else:
+            cvfile = open(f'{opts.CVfile_prefix}_{name}.txt', 'w')
+            args.CVfile = cvfile
         args.seed = opts.seed
         pseudo_counts = opts.pseudo_counts
         penalty_values = opts.penalty_values
@@ -47,9 +51,15 @@ def get_kmerpapa(super_pattern, contextD, opts):
         #If if remove the global variables in kmerpapa I can skip these lines.
         reload(bottum_up_array_penalty_plus_pseudo_CV)
         reload(bottum_up_array_w_numba)
-        best_alpha, best_penalty, test_score = bottum_up_array_penalty_plus_pseudo_CV.pattern_partition_bottom_up(super_pattern, contextD, pseudo_counts, args, n_bad, n_good, penalty_values)
+        if len(pseudo_counts) == 1 and len(penalty_values) == 1:
+            best_alpha = pseudo_counts[0]
+            best_penalty = penalty_values[0]
+        else:
+            best_alpha, best_penalty, test_score = bottum_up_array_penalty_plus_pseudo_CV.pattern_partition_bottom_up(super_pattern, contextD, pseudo_counts, args, n_bad, n_good, penalty_values)
         best_beta = (best_alpha*(1.0-my))/my
         best_score, M, U, names = bottum_up_array_w_numba.pattern_partition_bottom_up(super_pattern, contextD, best_alpha, best_beta, best_penalty, opts, n_bad, n_good, index_mut=0)
+        if not args.CVfile is None:
+            cvfile.close()
     if opts.verbosity > 0:
         eprint(f' .  best_penalty = {best_penalty}, best_alpha={best_alpha}, n_patterns={len(names)}')
     counts = []
