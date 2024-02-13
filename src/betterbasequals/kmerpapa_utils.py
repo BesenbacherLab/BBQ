@@ -29,7 +29,7 @@ def get_kmerpapa(super_pattern, contextD, name, opts):
         return {super_pattern: (0.01+n_bad, 1+n_good)}
         #return {super_pattern: -10*log10((n_bad)/(0.5+n_good +n_bad))}
     if opts.kmerpapa_method == 'greedy':
-        CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed)
+        CV = greedy_penalty_plus_pseudo.BaysianOptimizationCV(super_pattern, contextD, opts.nfolds, opts.iterations, opts.seed, min_pseudo=0.5, min_penalty=1.0)
         best_alpha, best_penalty, test_score = CV.get_best_a_c()
         #eprint(test_score)
         best_beta = (best_alpha*(1.0-my))/my
