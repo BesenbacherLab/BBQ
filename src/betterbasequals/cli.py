@@ -296,7 +296,7 @@ def run_get_kmerpapas(opts, event_kmers):
             super_pattern = 'N'*radius + ref + 'N'*radius
             notype = f'{ref}->{ref}'
             other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
-            eprint(f'Handling base_qual: {BQ_pair}, muttype: {mtype}')
+            eprint(f'Handling base_qual: {bqual}, muttype: {mtype}')
             for kmer in matches(super_pattern):
                 n_errors = event_kmers[('bad', bqual, mtype, kmer)]
                 n_not_error = event_kmers[('good', bqual, notype, kmer)]
@@ -304,7 +304,7 @@ def run_get_kmerpapas(opts, event_kmers):
                     n_not_error += event_kmers[('bad', bqual, other_type1, kmer)]
                     n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
                 contextD[kmer] = (n_errors, n_not_error)
-
+            
             kpp = get_kmerpapa(super_pattern, contextD, f'{mtype}_{bqual}', opts)
             if opts.estimated == "single":
                 estBQ = bqual
