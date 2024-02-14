@@ -2,14 +2,22 @@ import pysam
 import py2bit
 import os
 from collections import Counter
-from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, eprint, open_bam_w_index, SortedBed
+from betterbasequals.utils import reverse_complement, Read, zip_pileups_single_chrom, eprint, open_bam_w_index, SortedBed, ostrand
 
-def get_mut_type(ref, alt):
-    if ref in ['T', 'G']:
+# def get_mut_type(ref, alt):
+#     if ref in ['T', 'G']:
+#         mtype = reverse_complement(ref) + '->' + reverse_complement(alt)
+#     else:
+#         mtype = ref + '->' + alt
+#     return mtype
+
+def get_mut_type(ref, alt, kmer, is_reverse):
+    if is_reverse:
         mtype = reverse_complement(ref) + '->' + reverse_complement(alt)
     else:
         mtype = ref + '->' + alt
     return mtype
+
 
 def get_BQ_pair(BQ1, BQ2):
     if BQ1 > BQ2:
@@ -169,8 +177,8 @@ class MutationCounterWFilter:
         if ref not in "ATGC":
             return
         
-        if ref not in ['A', 'C']:
-            kmer = reverse_complement(kmer)
+        #if ref not in ['A', 'C']:
+        kmer_other_stand = reverse_complement(kmer)
 
         reads_mem = {}
         event_list = []
@@ -210,23 +218,26 @@ class MutationCounterWFilter:
                     continue
 
                 if read.allel == mem_read.allel:
-                    event_list.append(('good', read.allel, read.base_qual))
-                    event_list.append(('good', mem_read.allel, mem_read.base_qual))
-                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
+                    event_list.append(('good', read.allel, read.base_qual, read.is_reverse))
+                    event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse))
+
+                    #Count good tuples two times: once for each strand!
+                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), True))
+                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), False))
 
                     if max(read.base_qual, mem_read.base_qual) > 30:
                         has_good.add(read.allel)
 
                 else:
                     if read.allel != ref and mem_read.allel == ref:# and mem_read.base_qual > 30:
-                        event_list.append(('bad', read.allel, read.base_qual))
-                        event_list.append(('good', mem_read.allel, mem_read.base_qual))
-                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
+                        event_list.append(('bad', read.allel, read.base_qual, read.is_reverse))
+                        event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse))
+                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), read.is_reverse))
 
                     elif mem_read.allel != ref and read.allel == ref:# and read.base_qual > 30:
-                        event_list.append(('bad', mem_read.allel, mem_read.base_qual))
-                        event_list.append(('good', read.allel, read.base_qual))
-                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual)))
+                        event_list.append(('bad', mem_read.allel, mem_read.base_qual, mem_read.is_reverse))
+                        event_list.append(('good', read.allel, read.base_qual, read.is_reverse))
+                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), read.is_reverse))
 
             else:            
                 reads_mem[read.query_name] = read
@@ -234,7 +245,7 @@ class MutationCounterWFilter:
         # Handle reads without partner (ie. no overlap)
         for read in reads_mem.values():
             if read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
-                event_list.append(('singleton', read.allel, read.base_qual))
+                event_list.append(('singleton', read.allel, read.base_qual, read.is_reverse))
 
         if coverage < self.min_depth or coverage > self.max_depth:
             return
@@ -262,8 +273,12 @@ class MutationCounterWFilter:
         if major[0] != ref:
             return
 
-        for event_type, allele, base_qual in event_list:
-            mut_type = get_mut_type(ref, allele)     
-            
-            event_kmers[(event_type, base_qual, mut_type, kmer)] += 1
+        for event_type, allele, base_qual, is_reverse in event_list:
+            if is_reverse:
+                mut_type = f'{ostrand[ref]}->{ostrand[allele]}'
+                this_kmer = kmer_other_stand
+            else:
+                mut_type = f'{ref}->{allele}'
+                this_kmer = kmer
+            event_kmers[(event_type, base_qual, mut_type, this_kmer)] += 1
 

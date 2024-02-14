@@ -333,7 +333,7 @@ def run_get_kmerpapas(opts, event_kmers):
         double_EQ[BQ] = {}
         avg_single_EQ[BQ] = {}
         avg_double_EQ[BQ] = {}
-        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+        for mtype in change_mtypes: #('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             ref = mtype[0]
             alt = mtype[-1]
             super_pattern = 'N'*radius + ref + 'N'*radius
@@ -405,8 +405,6 @@ def run_get_kmerpapas(opts, event_kmers):
     if not opts.output_file_EQ is None:
         if opts.EQ_pat:
             print('BQ mutationtype pattern kmerpapa_alpha kmepapa_beta kmerpapa_rate single_mut single_nomut double_mut double_nomut single_EQ double_EQ subtract relative_EQ', file = opts.output_file_EQ)
-
-
 
     max_BQ = max(BQs)
     alpha = opts.EQ_pat_alpha #5 # pseudo count

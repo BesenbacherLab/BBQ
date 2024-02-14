@@ -30,7 +30,9 @@ class BBQFilter:
                 n_pass += 1
                 cov = itemgetter(1, 4)(line.split("\t")[7].split(";"))
                 cov_list.append(int(cov[0].split("=")[1]))
+                assert(cov[0].split("=")[0]=="N")
                 cov_total_list.append(int(cov[1].split("=")[1]))
+                assert(cov[1].split("=")[0]=="N_total")
         calls.close()
         eprint(f'Number of PASS calls before filtering: {n_pass}')
         

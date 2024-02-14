@@ -9,9 +9,10 @@ import pysam
 import os
 import gzip
 
-change_mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T')
-mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'A->A', 'C->C')
-
+change_mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T',
+                 'T->G', 'T->C', 'T->A', 'G->T', 'G->C', 'G->A')
+mtypes = ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'A->A', 'C->C',
+          'T->G', 'T->C', 'T->A', 'G->T', 'G->C', 'G->A', 'T->T', 'G->G')
 
 complement = str.maketrans("ATCGN", "TAGCN")
 
