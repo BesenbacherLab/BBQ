@@ -30,7 +30,9 @@ class BBQFilter:
                 n_pass += 1
                 cov = itemgetter(1, 4)(line.split("\t")[7].split(";"))
                 cov_list.append(int(cov[0].split("=")[1]))
+                assert(cov[0].split("=")[0]=="N")
                 cov_total_list.append(int(cov[1].split("=")[1]))
+                assert(cov[1].split("=")[0]=="N_total")
         calls.close()
         eprint(f'Number of PASS calls before filtering: {n_pass}')
         
@@ -40,11 +42,11 @@ class BBQFilter:
         # filtered coverage quantiles of PASS variants
         cov_q_l = np.quantile(cov_arr, self.cutoff_lower)
         cov_q_u = np.quantile(cov_arr, self.cutoff_upper)
-
+        
         # total coverage quantiles of PASS variants
         cov_total_q_l = np.quantile(cov_total_arr, self.cutoff_lower)
         cov_total_q_u = np.quantile(cov_total_arr, self.cutoff_upper)
-
+        eprint(cov_q_l, cov_q_u, cov_total_q_l, cov_total_q_u)
         # filter PASS variants based on coverage quantiles 
         pass_count = 0
         n_filtered = 0
