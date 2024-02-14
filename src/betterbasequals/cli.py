@@ -289,7 +289,7 @@ def run_get_kmerpapas(opts, event_kmers):
         kmer_papas[BQ_pair] = {}
         kmer_papas[bqual] = {}
         kmer_patterns[bqual] = {}
-        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+        for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             contextD = {}
             ref = mtype[0]
             alt = mtype[-1]
@@ -410,7 +410,7 @@ def run_get_kmerpapas(opts, event_kmers):
     alpha = opts.EQ_pat_alpha #5 # pseudo count
     # apply EQ correction
     for BQ in BQs:
-        for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+        for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             BQ_pair = f'({BQ},{BQ})'
             if (opts.subtract and
                 (BQ < max_BQ) and 
@@ -466,7 +466,7 @@ def run_get_kmerpapas(opts, event_kmers):
             BQ1_pair = f'({BQ1},{BQ1})'
             BQ2_pair = f'({BQ2},{BQ2})'
             kmer_papas[BQ_pair] = {}
-            for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+            for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
                 kmer_papas[BQ_pair][mtype] = {}
                 for kmer in kmer_papas[BQ1_pair][mtype]:
                     if opts.mean_type == 'geometric':
