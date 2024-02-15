@@ -610,7 +610,7 @@ class SomaticMutationCaller:
                     str_BQ = f'{BQ1}/{BQ2}'                    
                 BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, int(is_reverse), str_BQ))
 
-        for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ in events[R].values():
+        for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ, is_reverse in events[R].values():
             muttype_from_A, kmer_from_A = mut_type(A, R, ref_kmer, is_reverse)
             muttype_from_R, kmer_from_R = mut_type(R, R, ref_kmer, is_reverse)
             posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][kmer_from_A]
