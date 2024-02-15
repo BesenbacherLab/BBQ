@@ -68,35 +68,48 @@ for line in sys.stdin:
     fromA = L[3]
     toA = L[4]
     validation = L[-1]
+    
 
+    pos_type = f'{fromA}->{toA}'
+    neg_type = f'{ostrand[fromA]}->{ostrand[toA]}'
     if fromA in ['T','G']:
-        muttype=f'{ostrand[fromA]}->{ostrand[toA]}'
+        sym_muttype=f'{ostrand[fromA]}->{ostrand[toA]}'
     else:
-        muttype=f'{fromA}->{toA}'
+        sym_muttype=f'{fromA}->{toA}'
 
     if L[6] == 'PASS' or L[6] == 'lowBQ':
         D = dict(x.split('=') for x in  L[7].strip().split(';'))
         oldBQs = list_vals(D['oldBQ'])
         newBQs = [str(int(float(x))) for x in list_vals(D['newBQ'])]
+        strands = list_vals(D['strand'])
         kmer = D['kmer']
         
         assert(len(oldBQs)==len(newBQs))
         for i in range(len(oldBQs)):
             oldBQ = oldBQs[i]
+            strand = strands[i]
+            if strand == '0':
+                nonsym_muttype = pos_type
+            elif strand == '1':
+                nonsym_muttype = neg_type
+            else:
+                assert(False)
+            
             if '/' in oldBQ:
                 max_oldBQ = str(max(int(x) for x in oldBQ.split('/')))
             else:
                 max_oldBQ = oldBQ
             if kmer2pattern is None:
-                counter[(muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'])] += 1
+                counter[(muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'])] += 1
             else:
                 if kmer not in kmer2pattern[max_oldBQ][muttype]:
                     kmer = reverse_complement(kmer)
                 pattern = kmer2pattern[max_oldBQ][muttype][kmer]
-                counter[(muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], pattern)] += 1
+                counter[(muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], pattern)] += 1
 
 columns = [
-    'muttype',
+    'sym_muttype',
+    'nonsym_muttype',
     'oldBQ',
     'max_oldBQ',
     'newBQ',
