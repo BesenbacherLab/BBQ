@@ -103,7 +103,7 @@ def get_parser():
         '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10],
         help='Different pseudo count (alpha) values to test using cross validation')
     train_parent.add_argument(
-        '-c', '--penalty_values', type=float, metavar='c', nargs='+', default = [5,10,15,20],
+        '-c', '--penalty_values', type=float, metavar='c', nargs='+', default = [1,3,5,7,9,11],#[5,10,15,20],
         help='Different penalty values to test using cross validation.')
 
     # args for validating models:    
