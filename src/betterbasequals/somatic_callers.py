@@ -561,12 +561,8 @@ class SomaticMutationCaller:
         for BQ in observed_BQs:
             new_mut_probs[BQ] = defaultdict(dict)
 
-            for ref_from_base in relevant_bases:
+            for from_base in relevant_bases:
                 for is_reverse in [True, False]:
-                    if is_reverse:
-                        from_base = ostrand[ref_from_base]
-                    else:
-                        from_base = ref_from_base
                     p_rest = 1.0
                     stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer, is_reverse)
                     for to_base in ['A', 'C', 'G', 'T']:
@@ -578,9 +574,11 @@ class SomaticMutationCaller:
 
                         a = p_prior * self.prior_N
                         b = self.prior_N - a
-                        if self.no_update or ref_from_base != ref:
+
+                        if self.no_update or from_base != ref:
                             p_posterior = a/(a + b)
                         else:
+                            #TODO: Try not splitting on to_base.
                             p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
                         p_rest -= p_posterior
 
