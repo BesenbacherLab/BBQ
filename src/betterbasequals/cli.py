@@ -93,6 +93,10 @@ def get_parser():
     train_parent.add_argument('--min1EQ', action='store_true')
     train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
+    train_parent.add_argument('--double_method', type=str, default = 'avg_EQ',
+                              choices = ['avg_EQ', 'min_EQ', 'min_single'])
+    train_parent.add_argument("--double_log", type=argparse.FileType('w'))
+
     train_parent.add_argument('--mean_type', type=str, default = 'geometric',
                               choices = ['geometric', 'harmonic'])
     train_parent.add_argument(
@@ -456,6 +460,28 @@ def run_get_kmerpapas(opts, event_kmers):
     
     if not opts.output_file_EQ is None:
         opts.output_file_EQ.close() 
+
+    for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+        sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
+        for BQ in BQs:
+            BQ_pair = f'({BQ},{BQ})'
+            ref = mtype[0]
+            super_pattern = 'N'*radius + ref + 'N'*radius
+            for kmer in matches(super_pattern):
+                plus_prob = kmer_papas[BQ_pair][mtype][kmer]
+                reverse_kmer = reverse_complement(kmer)
+                minus_prob = kmer_papas[BQ_pair][sym_type][reverse_kmer]
+                if opts.double_method == 'avg_EQ':
+                    new_p = sqrt(plus_prob*minus_prob)
+                elif opts.double_method == 'min_EQ':
+                    new_p = min(plus_prob,minus_prob)
+                elif opts.double_method == 'min_single':
+                    new_p = min(kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer])
+                kmer_papas[BQ_pair][mtype][kmer] = new_p
+                kmer_papas[BQ_pair][sym_type][reverse_kmer]
+                print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
+                    
+    #TODO: different pairs should have different rates for (pos_BQ37, neg_BQ11) and (pos BQ11, neg BQ37)
 
     # Estimate error rates for pairs of different BQs:
     for i in range(len(BQs)):
