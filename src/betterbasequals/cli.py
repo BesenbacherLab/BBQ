@@ -94,7 +94,7 @@ def get_parser():
     train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
     train_parent.add_argument('--double_method', type=str, default = 'avg_EQ',
-                              choices = ['avg_EQ', 'min_EQ', 'min_single'])
+                              choices = ['avg_EQ', 'min_EQ', 'min_single', 'avg_single'])
     train_parent.add_argument("--double_log", type=argparse.FileType('w'))
 
     train_parent.add_argument('--mean_type', type=str, default = 'geometric',
