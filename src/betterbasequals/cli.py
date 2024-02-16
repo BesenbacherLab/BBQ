@@ -491,7 +491,10 @@ def run_get_kmerpapas(opts, event_kmers):
                 BQ_pair = f'({BQ1},{BQ2})'
                 BQ1_pair = f'({BQ1},{BQ1})'
                 BQ2_pair = f'({BQ2},{BQ2})'
-                kmer_papas[BQ_pair] = {}
+                if BQ_pair not in kmer_papas:
+                    kmer_papas[BQ_pair] = {}
+                if mtype not in kmer_papas[BQ_pair]:
+                    kmer_papas[BQ_pair][mtype] = {}
                 sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
                 super_pattern = 'N'*radius + ref + 'N'*radius
                 for kmer in matches(super_pattern):
@@ -507,7 +510,7 @@ def run_get_kmerpapas(opts, event_kmers):
                     elif opts.double_method == 'avg_single':
                         new_p = sqrt(kmer_papas[BQ1][mtype][kmer] * kmer_papas[BQ2][sym_type][reverse_kmer])
                     kmer_papas[BQ_pair][mtype][kmer] = new_p
-                print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
+                    print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
             
     #     sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
     #     for BQ in BQs:
