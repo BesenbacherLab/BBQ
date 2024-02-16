@@ -461,46 +461,93 @@ def run_get_kmerpapas(opts, event_kmers):
     if not opts.output_file_EQ is None:
         opts.output_file_EQ.close() 
 
-    for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-        sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
-        for BQ in BQs:
-            BQ_pair = f'({BQ},{BQ})'
-            ref = mtype[0]
-            super_pattern = 'N'*radius + ref + 'N'*radius
-            for kmer in matches(super_pattern):
-                plus_prob = kmer_papas[BQ_pair][mtype][kmer]
-                reverse_kmer = reverse_complement(kmer)
-                minus_prob = kmer_papas[BQ_pair][sym_type][reverse_kmer]
-                if opts.double_method == 'avg_EQ':
-                    new_p = sqrt(plus_prob*minus_prob)
-                elif opts.double_method == 'min_EQ':
-                    new_p = min(plus_prob,minus_prob)
-                elif opts.double_method == 'min_single':
-                    new_p = min(kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer])
-                kmer_papas[BQ_pair][mtype][kmer] = new_p
-                kmer_papas[BQ_pair][sym_type][reverse_kmer]
-                print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
-                    
-    #TODO: different pairs should have different rates for (pos_BQ37, neg_BQ11) and (pos BQ11, neg BQ37)
 
-    # Estimate error rates for pairs of different BQs:
-    for i in range(len(BQs)):
-        for j in range(i+1, len(BQs)):
-            BQ1 = BQs[i]
-            BQ2 = BQs[j]
-            BQ_pair = f'({BQ1},{BQ2})'
-            BQ1_pair = f'({BQ1},{BQ1})'
-            BQ2_pair = f'({BQ2},{BQ2})'
-            kmer_papas[BQ_pair] = {}
-            for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-                kmer_papas[BQ_pair][mtype] = {}
-                for kmer in kmer_papas[BQ1_pair][mtype]:
-                    if opts.mean_type == 'geometric':
-                        kmer_papas[BQ_pair][mtype][kmer] = \
-                            sqrt(kmer_papas[BQ1_pair][mtype][kmer]*kmer_papas[BQ2_pair][mtype][kmer])
-                    elif opts.mean_type == 'harmonic':
-                        kmer_papas[BQ_pair][mtype][kmer] = \
-                            1.0/(((1.0/kmer_papas[BQ1_pair][mtype][kmer]) + (1.0/kmer_papas[BQ2_pair][mtype][kmer]))/2)
+    # for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+    #     sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
+    #     for BQ in BQs:
+    #         BQ_pair = f'({BQ},{BQ})'
+    #         ref = mtype[0]
+    #         super_pattern = 'N'*radius + ref + 'N'*radius
+    #         for kmer in matches(super_pattern):
+    #             plus_prob = kmer_papas[BQ_pair][mtype][kmer]
+    #             reverse_kmer = reverse_complement(kmer)
+    #             minus_prob = kmer_papas[BQ_pair][sym_type][reverse_kmer]
+    #             if opts.double_method == 'avg_EQ':
+    #                 new_p = sqrt(plus_prob*minus_prob)
+    #             elif opts.double_method == 'min_EQ':
+    #                 new_p = min(plus_prob,minus_prob)
+    #             elif opts.double_method == 'min_single':
+    #                 new_p = min(kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer])
+    #             kmer_papas[BQ_pair][mtype][kmer] = new_p
+    #             kmer_papas[BQ_pair][sym_type][reverse_kmer]
+    #             print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
+                    
+
+    for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+        for i in range(len(BQs)):
+            for j in range(i, len(BQs)):
+                BQ1 = BQs[i]
+                BQ2 = BQs[j]
+                BQ_pair = f'({BQ1},{BQ2})'
+                BQ1_pair = f'({BQ1},{BQ1})'
+                BQ2_pair = f'({BQ2},{BQ2})'
+                kmer_papas[BQ_pair] = {}
+                sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
+                super_pattern = 'N'*radius + ref + 'N'*radius
+                for kmer in matches(super_pattern):
+                    plus_prob = kmer_papas[BQ1_pair][mtype][kmer]
+                    reverse_kmer = reverse_complement(kmer)
+                    minus_prob = kmer_papas[BQ2_pair][sym_type][reverse_kmer]
+                    if opts.double_method == 'avg_EQ':
+                        new_p = sqrt(plus_prob*minus_prob)
+                    elif opts.double_method == 'min_EQ':
+                        new_p = min(plus_prob, minus_prob)
+                    elif opts.double_method == 'min_single':
+                        new_p = min(kmer_papas[BQ1][mtype][kmer], kmer_papas[BQ2][sym_type][reverse_kmer])
+                    elif opts.double_method == 'avg_single':
+                        new_p = sqrt(kmer_papas[BQ1][mtype][kmer] * kmer_papas[BQ2][sym_type][reverse_kmer])
+                    kmer_papas[BQ_pair][mtype][kmer] = new_p
+                print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
+            
+    #     sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
+    #     for BQ in BQs:
+    #         BQ_pair = f'({BQ},{BQ})'
+    #         ref = mtype[0]
+    #         super_pattern = 'N'*radius + ref + 'N'*radius
+    #         for kmer in matches(super_pattern):
+    #             plus_prob = kmer_papas[BQ_pair][mtype][kmer]
+    #             reverse_kmer = reverse_complement(kmer)
+    #             minus_prob = kmer_papas[BQ_pair][sym_type][reverse_kmer]
+    #             if opts.double_method == 'avg_EQ':
+    #                 new_p = sqrt(plus_prob*minus_prob)
+    #             elif opts.double_method == 'min_EQ':
+    #                 new_p = min(plus_prob,minus_prob)
+    #             elif opts.double_method == 'min_single':
+    #                 new_p = min(kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer])
+    #             kmer_papas[BQ_pair][mtype][kmer] = new_p
+    #             kmer_papas[BQ_pair][sym_type][reverse_kmer]
+    #             print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
+                    
+    # #TODO: different pairs should have different rates for (pos_BQ37, neg_BQ11) and (pos BQ11, neg BQ37)
+
+    # # Estimate error rates for pairs of different BQs:
+    # for i in range(len(BQs)):
+    #     for j in range(i+1, len(BQs)):
+    #         BQ1 = BQs[i]
+    #         BQ2 = BQs[j]
+    #         BQ_pair = f'({BQ1},{BQ2})'
+    #         BQ1_pair = f'({BQ1},{BQ1})'
+    #         BQ2_pair = f'({BQ2},{BQ2})'
+    #         kmer_papas[BQ_pair] = {}
+    #         for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
+    #             kmer_papas[BQ_pair][mtype] = {}
+    #             for kmer in kmer_papas[BQ1_pair][mtype]:
+    #                 if opts.mean_type == 'geometric':
+    #                     kmer_papas[BQ_pair][mtype][kmer] = \
+    #                         sqrt(kmer_papas[BQ1_pair][mtype][kmer]*kmer_papas[BQ2_pair][mtype][kmer])
+    #                 elif opts.mean_type == 'harmonic':
+    #                     kmer_papas[BQ_pair][mtype][kmer] = \
+    #                         1.0/(((1.0/kmer_papas[BQ1_pair][mtype][kmer]) + (1.0/kmer_papas[BQ2_pair][mtype][kmer]))/2)
 
                     #TODO: Should we try harmonic mean?
 

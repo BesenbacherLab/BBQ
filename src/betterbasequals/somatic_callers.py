@@ -484,9 +484,11 @@ class SomaticMutationCaller:
                     if read.base_qual > mem_read.base_qual:
                         read_BQ = (read.base_qual, mem_read.base_qual)
                         BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
+                        is_reverse = read.is_reverse
                     else:
                         read_BQ = (mem_read.base_qual, read.base_qual)
                         BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
+                        is_reverse = read.is_reverse
 
                     observed_BQs.add(BQ_pair)
                     enddist = max(read.enddist, mem_read.enddist)
@@ -497,11 +499,11 @@ class SomaticMutationCaller:
                     assert read.start < read.end
                     assert mem_read.start < mem_read.end
                     if fragment_id not in events[X]:
-                        events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, False)
+                        events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, is_reverse)
                     else:
                         o_read_BQ = events[X][fragment_id][0]
                         if o_read_BQ < read_BQ:
-                            events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, False)
+                            events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, is_reverse)
 
                 else: # Mismatch
                     #if not no_update:
