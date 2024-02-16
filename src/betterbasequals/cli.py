@@ -496,7 +496,7 @@ def run_get_kmerpapas(opts, event_kmers):
                 if mtype not in kmer_papas[BQ_pair]:
                     kmer_papas[BQ_pair][mtype] = {}
                 sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
-                super_pattern = 'N'*radius + ref + 'N'*radius
+                super_pattern = 'N'*radius + mtype[0] + 'N'*radius
                 for kmer in matches(super_pattern):
                     plus_prob = kmer_papas[BQ1_pair][mtype][kmer]
                     reverse_kmer = reverse_complement(kmer)
