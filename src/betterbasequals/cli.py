@@ -294,7 +294,7 @@ def run_get_kmerpapas(opts, event_kmers):
     BQs = list(set(x[1] for x in event_kmers if x[0]in ['good', 'bad']))
     BQs.sort()
     BQs = BQs[::-1]
-    radius = len(next(iter(event_kmers.keys()))[3])//2
+    radius = len(next(iter(event_kmers.keys()))[4])//2
     for bqual in BQs:
         BQ_pair = f'({bqual},{bqual})'
         kmer_papas[BQ_pair] = {}
