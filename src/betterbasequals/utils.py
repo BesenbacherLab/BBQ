@@ -270,8 +270,8 @@ def read_kmers(opts):
     if opts.verbosity > 0:
         eprint("Reading kmer counts")
     for line in opts.input_file_kmers:
-        event_type, bqual, mtype, kmer, count = line.split()
-        event_kmers[(event_type, bqual, mtype, kmer)] = int(count)
+        event_type, bqual, mtype, is_R1, kmer, count = line.split()
+        event_kmers[(event_type, bqual, mtype, is_R1, kmer)] = int(count)
     return event_kmers
 
 

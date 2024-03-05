@@ -218,26 +218,27 @@ class MutationCounterWFilter:
                     continue
 
                 if read.allel == mem_read.allel:
-                    event_list.append(('good', read.allel, read.base_qual, read.is_reverse))
-                    event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse))
+                    event_list.append(('good', read.allel, read.base_qual, read.is_reverse, read.isR1))
+                    event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse, read.isR1))
 
                     #Count good tuples two times: once for each strand!
-                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), True))
-                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), False))
+                    #TODO: Why?
+                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), read.is_reverse, read.isR1))
+                    event_list.append(('good_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), mem_read.is_reverse, mem_read.isR1))
 
                     if max(read.base_qual, mem_read.base_qual) > 30:
                         has_good.add(read.allel)
 
                 else:
                     if read.allel != ref and mem_read.allel == ref:# and mem_read.base_qual > 30:
-                        event_list.append(('bad', read.allel, read.base_qual, read.is_reverse))
-                        event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse))
-                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), read.is_reverse))
+                        event_list.append(('bad', read.allel, read.base_qual, read.is_revers, read.isR1))
+                        event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse, mem_read.isR1))
+                        event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), read.is_reverse, read.isR1))
 
                     elif mem_read.allel != ref and read.allel == ref:# and read.base_qual > 30:
-                        event_list.append(('bad', mem_read.allel, mem_read.base_qual, mem_read.is_reverse))
-                        event_list.append(('good', read.allel, read.base_qual, read.is_reverse))
-                        event_list.append(('bad_tuple', mem_read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), mem_read.is_reverse))
+                        event_list.append(('bad', mem_read.allel, mem_read.base_qual, mem_read.is_reverse, mem_read.isR1))
+                        event_list.append(('good', read.allel, read.base_qual, read.is_reverse, read.isR1))
+                        event_list.append(('bad_tuple', mem_read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), mem_read.is_reverse, mem_read.isR1))
 
             else:            
                 reads_mem[read.query_name] = read
@@ -245,7 +246,7 @@ class MutationCounterWFilter:
         # Handle reads without partner (ie. no overlap)
         for read in reads_mem.values():
             if read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
-                event_list.append(('singleton', read.allel, read.base_qual, read.is_reverse))
+                event_list.append(('singleton', read.allel, read.base_qual, read.is_reverse, read.isR1))
 
         if coverage < self.min_depth or coverage > self.max_depth:
             return
@@ -273,12 +274,12 @@ class MutationCounterWFilter:
         if major[0] != ref:
             return
 
-        for event_type, allele, base_qual, is_reverse in event_list:
+        for event_type, allele, base_qual, is_reverse, is_R1 in event_list:
             if is_reverse:
                 mut_type = f'{ostrand[ref]}->{ostrand[allele]}'
                 this_kmer = kmer_other_stand
             else:
                 mut_type = f'{ref}->{allele}'
                 this_kmer = kmer
-            event_kmers[(event_type, base_qual, mut_type, this_kmer)] += 1
+            event_kmers[(event_type, base_qual, mut_type, int(is_R1), this_kmer)] += 1
 

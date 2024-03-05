@@ -278,6 +278,13 @@ def run_get_good_and_bad_w_filter(opts):
     #         bad_kmers[BQ][mtype][kmer] = count
     # return good_kmers, bad_kmers
 
+def other_read(is_R1):
+    if is_R1 == '0':
+        return '1'
+    elif is_R1 == '1':
+        return '0'
+    else:
+        assert False, "ERROR: is_R1 is not 0 or 1!"
 
 def run_get_kmerpapas(opts, event_kmers):
     if opts.verbosity > 0:
@@ -294,38 +301,41 @@ def run_get_kmerpapas(opts, event_kmers):
         kmer_papas[bqual] = {}
         kmer_patterns[bqual] = {}
         for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-            contextD = {}
-            ref = mtype[0]
-            alt = mtype[-1]
-            super_pattern = 'N'*radius + ref + 'N'*radius
-            notype = f'{ref}->{ref}'
-            other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
-            eprint(f'Handling base_qual: {bqual}, muttype: {mtype}')
-            for kmer in matches(super_pattern):
-                n_errors = event_kmers[('bad', bqual, mtype, kmer)]
-                n_not_error = event_kmers[('good', bqual, notype, kmer)]
-                if not opts.same_good:
-                    n_not_error += event_kmers[('bad', bqual, other_type1, kmer)]
-                    n_not_error += event_kmers[('bad', bqual, other_type2, kmer)]
-                contextD[kmer] = (n_errors, n_not_error)
-            
-            kpp = get_kmerpapa(super_pattern, contextD, f'{mtype}_{bqual}', opts)
-            if opts.estimated == "single":
-                estBQ = bqual
-            elif opts.estimated == "double":
-                estBQ = BQ_pair
-
-            kmer_papas[bqual][mtype] = {}    
+            kmer_papas[bqual][mtype] = {}
             kmer_papas[BQ_pair][mtype] = {}
-            
-            kmer_patterns[bqual][mtype] = kpp#list(kpp.keys())
-            for pat in kpp:
-                alpha, beta = kpp[pat]
-                p_error = min(0.25, alpha / (alpha + beta))
-                if opts.verbosity > 1:
-                    eprint(estBQ, mtype, pat, p_error, -10*log10(p_error))
-                for kmer in matches(pat):
-                    kmer_papas[estBQ][mtype][kmer] = p_error
+            kmer_patterns[bqual][mtype] = {}
+            for is_R1 in ['0', '1']:
+                contextD = {}
+                ref = mtype[0]
+                alt = mtype[-1]
+                super_pattern = 'N'*radius + ref + 'N'*radius
+                notype = f'{ref}->{ref}'
+                other_type1, other_type2 = [f'{ref}->{other}' for other in 'ACGT' if other != alt and other != ref]
+                eprint(f'Handling base_qual: {bqual}, muttype: {mtype}')
+                for kmer in matches(super_pattern):
+                    n_errors = event_kmers[('bad', bqual, mtype, is_R1, kmer)]
+                    n_not_error = event_kmers[('good', bqual, notype, is_R1, kmer)]
+                    if not opts.same_good:
+                        n_not_error += event_kmers[('bad', bqual, other_type1, is_R1, kmer)]
+                        n_not_error += event_kmers[('bad', bqual, other_type2, is_R1, kmer)]
+                    contextD[kmer] = (n_errors, n_not_error)
+                
+                kpp = get_kmerpapa(super_pattern, contextD, f'{mtype}_{bqual}', opts)
+                if opts.estimated == "single":
+                    estBQ = bqual
+                elif opts.estimated == "double":
+                    estBQ = BQ_pair
+                
+                kmer_papas[bqual][mtype][is_R1] = {}
+                kmer_papas[BQ_pair][mtype][is_R1] = {}
+                kmer_patterns[bqual][mtype][is_R1] = kpp#list(kpp.keys())
+                for pat in kpp:
+                    alpha, beta = kpp[pat]
+                    p_error = min(0.25, alpha / (alpha + beta))
+                    if opts.verbosity > 1:
+                        eprint(estBQ, mtype, is_R1, pat, p_error, -10*log10(p_error))
+                    for kmer in matches(pat):
+                        kmer_papas[estBQ][mtype][is_R1][kmer] = p_error
 
     # Estimate EQ correction for bases in overlaps
     single_EQ = {}
@@ -362,41 +372,46 @@ def run_get_kmerpapas(opts, event_kmers):
                 double_EQ[BQ][mtype] = {}
                 avg_single_EQ[BQ][mtype] = {}
                 avg_double_EQ[BQ][mtype] = {}
-                for pat in kmer_patterns[BQ][mtype]:
-                    single_mut = 0
-                    single_nomut = 0
-                    double_mut = 0
-                    double_nomut = 0
-                    for kmer in matches(pat):
-                        single_mut += event_kmers[('singleton', BQ, mtype, kmer)]
-                        single_nomut += event_kmers[('singleton', BQ, notype, kmer)]
-                        double_mut += event_kmers[('good_tuple', BQ_pair, mtype, kmer)]
-                        double_nomut += event_kmers[('good_tuple', BQ_pair, notype, kmer)]
-                        #TODO: add other muttypes from good_tuple and single to nomut?
-                        double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
-                        double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
-                        double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
-                    total_single_mut += single_mut
-                    total_single_nomut += single_nomut
-                    total_double_mut += double_mut
-                    total_double_nomut += double_nomut
-                    single_EQ[BQ][mtype][pat] = (single_mut, single_nomut)#(single_mut+0.1) / (single_mut + single_nomut + 0.2)
-                    double_EQ[BQ][mtype][pat] = (double_mut, double_nomut)#(double_mut+0.1) / (double_mut + double_nomut + 0.2)
-                avg_single_EQ[BQ][mtype] = (total_single_mut + 0.1) / (total_single_mut + total_single_nomut + 0.2)
-                avg_double_EQ[BQ][mtype] = (total_double_mut + 0.1) / (total_double_mut + total_double_nomut + 0.2)
+                for is_R1 in ['0', '1']:
+                    single_EQ[BQ][mtype][is_R1] = {}
+                    double_EQ[BQ][mtype][is_R1] = {}
+                    avg_single_EQ[BQ][mtype][is_R1] = {}
+                    avg_double_EQ[BQ][mtype][is_R1] = {}
+                    for pat in kmer_patterns[BQ][mtype][is_R1]:
+                        single_mut = 0
+                        single_nomut = 0
+                        double_mut = 0
+                        double_nomut = 0
+                        for kmer in matches(pat):
+                            single_mut += event_kmers[('singleton', BQ, mtype, is_R1, kmer)]
+                            single_nomut += event_kmers[('singleton', BQ, notype, is_R1, kmer)]
+                            double_mut += event_kmers[('good_tuple', BQ_pair, mtype, is_R1, kmer)]
+                            double_nomut += event_kmers[('good_tuple', BQ_pair, notype, is_R1, kmer)]
+                            #TODO: add other muttypes from good_tuple and single to nomut?
+                            double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, is_R1, kmer)]
+                            double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, is_R1, kmer)]
+                            double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, is_R1, kmer)]
+                        total_single_mut += single_mut
+                        total_single_nomut += single_nomut
+                        total_double_mut += double_mut
+                        total_double_nomut += double_nomut
+                        single_EQ[BQ][mtype][is_R1][pat] = (single_mut, single_nomut)#(single_mut+0.1) / (single_mut + single_nomut + 0.2)
+                        double_EQ[BQ][mtype][is_R1][pat] = (double_mut, double_nomut)#(double_mut+0.1) / (double_mut + double_nomut + 0.2)
+                    avg_single_EQ[BQ][mtype][is_R1] = (total_single_mut + 0.1) / (total_single_mut + total_single_nomut + 0.2)
+                    avg_double_EQ[BQ][mtype][is_R1] = (total_double_mut + 0.1) / (total_double_mut + total_double_nomut + 0.2)
 
             else:
-                for kmer in kmer_papas[BQest][mtype]:
-                    single_mut += event_kmers[('singleton', BQ, mtype, kmer)]
-                    single_nomut += event_kmers[('singleton', BQ, notype, kmer)]
-                    double_mut += event_kmers[('good_tuple', BQ_pair, mtype, kmer)]
-                    double_nomut += event_kmers[('good_tuple', BQ_pair, notype, kmer)]
+                for kmer in kmer_papas[BQest][mtype][is_R1]:
+                    single_mut += event_kmers[('singleton', BQ, mtype, is_R1, kmer)]
+                    single_nomut += event_kmers[('singleton', BQ, notype, is_R1, kmer)]
+                    double_mut += event_kmers[('good_tuple', BQ_pair, mtype, is_R1, kmer)]
+                    double_nomut += event_kmers[('good_tuple', BQ_pair, notype, is_R1, kmer)]
                     #TODO: add other muttypes from good_tuple and single to nomut?
-                    double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, kmer)]
-                    double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, kmer)]
-                    double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, kmer)]
-                single_EQ[BQ][mtype] = (single_mut+0.1) / (single_mut + single_nomut + 0.2)
-                double_EQ[BQ][mtype] = (double_mut+0.1) / (double_mut + double_nomut + 0.2)
+                    double_nomut += event_kmers[('bad_tuple', BQ_pair, mtype, is_R1, kmer)]
+                    double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type1, is_R1, kmer)]
+                    double_nomut += event_kmers[('bad_tuple', BQ_pair, other_type2, is_R1, kmer)]
+                single_EQ[BQ][mtype][is_R1] = (single_mut+0.1) / (single_mut + single_nomut + 0.2)
+                double_EQ[BQ][mtype][is_R1] = (double_mut+0.1) / (double_mut + double_nomut + 0.2)
            
            # rel_EQ = single_EQ / double_EQ
 
@@ -408,7 +423,7 @@ def run_get_kmerpapas(opts, event_kmers):
 
     if not opts.output_file_EQ is None:
         if opts.EQ_pat:
-            print('BQ mutationtype pattern kmerpapa_alpha kmepapa_beta kmerpapa_rate single_mut single_nomut double_mut double_nomut single_EQ double_EQ subtract relative_EQ', file = opts.output_file_EQ)
+            print('BQ mutationtype isR1 pattern kmerpapa_alpha kmepapa_beta kmerpapa_rate single_mut single_nomut double_mut double_nomut single_EQ double_EQ subtract relative_EQ', file = opts.output_file_EQ)
 
     max_BQ = max(BQs)
     alpha = opts.EQ_pat_alpha #5 # pseudo count
@@ -416,47 +431,52 @@ def run_get_kmerpapas(opts, event_kmers):
     for BQ in BQs:
         for mtype in change_mtypes:#('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
             BQ_pair = f'({BQ},{BQ})'
-            if (opts.subtract and
-                (BQ < max_BQ) and 
-                (single_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8) and 
-                (double_EQ[BQ][mtype] > double_EQ[max_BQ][mtype] + 1e-8)):
-                subtract = double_EQ[max_BQ][mtype]
-            else:
-                subtract = 0.0
-
-            if not opts.EQ_pat:
-                rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
-                if not opts.output_file_EQ is None:
-                    print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
-
             if opts.estimated == "single":
                 kmer_papas[BQ_pair][mtype] = {}
-                if opts.EQ_pat:
-                    for pat in single_EQ[BQ][mtype]:
-                        single_mut, single_nomut = single_EQ[BQ][mtype][pat]
-                        double_mut, double_nomut =  double_EQ[BQ][mtype][pat]    
-                        beta_single = (alpha*(1.0-avg_single_EQ[BQ][mtype]))/avg_single_EQ[BQ][mtype]
-                        beta_double = (alpha*(1.0-avg_double_EQ[BQ][mtype]))/avg_double_EQ[BQ][mtype]
-                        s_EQ = (single_mut + alpha) / (single_mut + single_nomut + alpha +beta_single)
-                        d_EQ = (double_mut + alpha) / (double_mut + double_nomut + alpha +beta_double)
-                        rel_EQ = s_EQ / d_EQ
-                        if opts.min1EQ:
-                            rel_EQ = max(1.0, rel_EQ)
-                        if not opts.output_file_EQ is None:
-                            kmp_alpha, kmp_beta = kmer_patterns[BQ][mtype][pat]
-                            print(BQ, mtype, pat, kmp_alpha, kmp_beta, kmp_alpha/(kmp_alpha+kmp_beta), single_mut, single_nomut, double_mut, double_nomut, s_EQ, d_EQ, subtract, rel_EQ, file = opts.output_file_EQ)
-                        for kmer in matches(pat):
-                            kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
-                
-                else:
-                    for kmer in kmer_papas[BQ][mtype]:
-                        kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
-                
-
             elif opts.estimated == "double":
                 kmer_papas[BQ][mtype] = {}
-                for kmer in kmer_papas[BQ_pair][mtype]:
-                    kmer_papas[BQ][mtype][kmer] = min(kmer_papas[BQ_pair][mtype][kmer] * rel_EQ, 0.25)
+            for is_R1 in ['0', '1']:
+                if (opts.subtract and
+                    (BQ < max_BQ) and 
+                    (single_EQ[BQ][mtype][is_R1] > double_EQ[max_BQ][mtype][is_R1] + 1e-8) and 
+                    (double_EQ[BQ][mtype][is_R1] > double_EQ[max_BQ][mtype][is_R1] + 1e-8)):
+                    subtract = double_EQ[max_BQ][mtype][is_R1]
+                else:
+                    subtract = 0.0
+
+                if not opts.EQ_pat:
+                    rel_EQ = (single_EQ[BQ][mtype][is_R1] - subtract) / (double_EQ[BQ][mtype][is_R1] - subtract)
+                    if not opts.output_file_EQ is None:
+                        print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
+
+                if opts.estimated == "single":
+                    kmer_papas[BQ_pair][mtype][is_R1] = {}
+                    if opts.EQ_pat:
+                        for pat in single_EQ[BQ][mtype][is_R1]:
+                            single_mut, single_nomut = single_EQ[BQ][mtype][is_R1][pat]
+                            double_mut, double_nomut =  double_EQ[BQ][mtype][is_R1][pat]    
+                            beta_single = (alpha*(1.0-avg_single_EQ[BQ][mtype][is_R1]))/avg_single_EQ[BQ][mtype][is_R1]
+                            beta_double = (alpha*(1.0-avg_double_EQ[BQ][mtype][is_R1]))/avg_double_EQ[BQ][mtype][is_R1]
+                            s_EQ = (single_mut + alpha) / (single_mut + single_nomut + alpha +beta_single)
+                            d_EQ = (double_mut + alpha) / (double_mut + double_nomut + alpha +beta_double)
+                            rel_EQ = s_EQ / d_EQ
+                            if opts.min1EQ:
+                                rel_EQ = max(1.0, rel_EQ)
+                            if not opts.output_file_EQ is None:
+                                kmp_alpha, kmp_beta = kmer_patterns[BQ][mtype][is_R1][pat]
+                                print(BQ, mtype, is_R1, pat, kmp_alpha, kmp_beta, kmp_alpha/(kmp_alpha+kmp_beta), single_mut, single_nomut, double_mut, double_nomut, s_EQ, d_EQ, subtract, rel_EQ, file = opts.output_file_EQ)
+                            for kmer in matches(pat):
+                                kmer_papas[BQ_pair][mtype][is_R1][kmer] = min(kmer_papas[BQ][mtype][is_R1][kmer] / rel_EQ, 0.25)
+                    
+                    else:
+                        for kmer in kmer_papas[BQ][mtype][is_R1]:
+                            kmer_papas[BQ_pair][mtype][is_R1][kmer] = min(kmer_papas[BQ][mtype][is_R1][kmer] / rel_EQ, 0.25)
+                    
+
+                elif opts.estimated == "double":
+                    kmer_papas[BQ][mtype][is_R1] = {}
+                    for kmer in kmer_papas[BQ_pair][mtype][is_R1]:
+                        kmer_papas[BQ][mtype][is_R1][kmer] = min(kmer_papas[BQ_pair][mtype][is_R1][kmer] * rel_EQ, 0.25)
     
     if not opts.output_file_EQ is None:
         opts.output_file_EQ.close() 
@@ -497,21 +517,22 @@ def run_get_kmerpapas(opts, event_kmers):
                     kmer_papas[BQ_pair][mtype] = {}
                 sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
                 super_pattern = 'N'*radius + mtype[0] + 'N'*radius
-                for kmer in matches(super_pattern):
-                    plus_prob = kmer_papas[BQ1_pair][mtype][kmer]
-                    reverse_kmer = reverse_complement(kmer)
-                    minus_prob = kmer_papas[BQ2_pair][sym_type][reverse_kmer]
-                    if opts.double_method == 'avg_EQ':
-                        new_p = sqrt(plus_prob*minus_prob)
-                    elif opts.double_method == 'min_EQ':
-                        new_p = min(plus_prob, minus_prob)
-                    elif opts.double_method == 'min_single':
-                        new_p = min(kmer_papas[BQ1][mtype][kmer], kmer_papas[BQ2][sym_type][reverse_kmer])
-                    elif opts.double_method == 'avg_single':
-                        new_p = sqrt(kmer_papas[BQ1][mtype][kmer] * kmer_papas[BQ2][sym_type][reverse_kmer])
-                    kmer_papas[BQ_pair][mtype][kmer] = new_p
-                    print(BQ_pair, mtype, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][kmer], kmer_papas[BQ][sym_type][reverse_kmer], new_p, file=opts.double_log)
-            
+                for is_R1 in ['0', '1']:
+                    for kmer in matches(super_pattern):
+                        plus_prob = kmer_papas[BQ1_pair][mtype][is_R1][kmer]
+                        reverse_kmer = reverse_complement(kmer)
+                        minus_prob = kmer_papas[BQ2_pair][sym_type][other_read(is_R1)][reverse_kmer]
+                        if opts.double_method == 'avg_EQ':
+                            new_p = sqrt(plus_prob*minus_prob)
+                        elif opts.double_method == 'min_EQ':
+                            new_p = min(plus_prob, minus_prob)
+                        elif opts.double_method == 'min_single':
+                            new_p = min(kmer_papas[BQ1][mtype][is_R1][kmer], kmer_papas[BQ2][sym_type][other_read(is_R1)][reverse_kmer])
+                        elif opts.double_method == 'avg_single':
+                            new_p = sqrt(kmer_papas[BQ1][mtype][is_R1][kmer] * kmer_papas[BQ2][sym_type][other_read(is_R1)][reverse_kmer])
+                        kmer_papas[BQ_pair][mtype][is_R1][kmer] = new_p
+                        print(BQ_pair, mtype, is_R1, kmer, sym_type, reverse_kmer, plus_prob, minus_prob, kmer_papas[BQ][mtype][is_R1][kmer], kmer_papas[BQ][sym_type][other_read(is_R1)][reverse_kmer], new_p, file=opts.double_log)
+                
     #     sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
     #     for BQ in BQs:
     #         BQ_pair = f'({BQ},{BQ})'
@@ -558,7 +579,8 @@ def run_get_kmerpapas(opts, event_kmers):
         for BQ in kmer_papas:
             for mtype in kmer_papas[BQ]:
                 for kmer in kmer_papas[BQ][mtype]:
-                    print(BQ, mtype, kmer, kmer_papas[BQ][mtype][kmer], file=opts.output_file_kmerpapa)                   
+                    for is_R1 in ['0', '1']:
+                        print(BQ, mtype, is_R1, kmer, kmer_papas[BQ][mtype][kmer], file=opts.output_file_kmerpapa)                   
         opts.output_file_kmerpapa.close()
     
     return kmer_papas
