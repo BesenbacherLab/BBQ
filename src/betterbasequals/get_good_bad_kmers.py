@@ -231,7 +231,7 @@ class MutationCounterWFilter:
 
                 else:
                     if read.allel != ref and mem_read.allel == ref:# and mem_read.base_qual > 30:
-                        event_list.append(('bad', read.allel, read.base_qual, read.is_revers, read.isR1))
+                        event_list.append(('bad', read.allel, read.base_qual, read.is_reverse, read.isR1))
                         event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse, mem_read.isR1))
                         event_list.append(('bad_tuple', read.allel, get_BQ_pair(read.base_qual, mem_read.base_qual), read.is_reverse, read.isR1))
 
