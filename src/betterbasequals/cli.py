@@ -518,6 +518,8 @@ def run_get_kmerpapas(opts, event_kmers):
                 sym_type = f'{ostrand[mtype[0]]}->{ostrand[mtype[-1]]}'
                 super_pattern = 'N'*radius + mtype[0] + 'N'*radius
                 for is_R1 in ['0', '1']:
+                    if is_R1 not in kmer_papas[BQ_pair][mtype]:
+                        kmer_papas[BQ_pair][mtype][is_R1] = {}
                     for kmer in matches(super_pattern):
                         plus_prob = kmer_papas[BQ1_pair][mtype][is_R1][kmer]
                         reverse_kmer = reverse_complement(kmer)
@@ -580,7 +582,7 @@ def run_get_kmerpapas(opts, event_kmers):
             for mtype in kmer_papas[BQ]:
                 for kmer in kmer_papas[BQ][mtype]:
                     for is_R1 in ['0', '1']:
-                        print(BQ, mtype, is_R1, kmer, kmer_papas[BQ][mtype][kmer], file=opts.output_file_kmerpapa)                   
+                        print(BQ, mtype, is_R1, kmer, kmer_papas[BQ][mtype][is_R1][kmer], file=opts.output_file_kmerpapa)                   
         opts.output_file_kmerpapa.close()
     
     return kmer_papas
