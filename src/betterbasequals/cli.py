@@ -580,8 +580,8 @@ def run_get_kmerpapas(opts, event_kmers):
     if not opts.output_file_kmerpapa is None:
         for BQ in kmer_papas:
             for mtype in kmer_papas[BQ]:
-                for kmer in kmer_papas[BQ][mtype]:
-                    for is_R1 in ['0', '1']:
+                for is_R1 in ['0', '1']:
+                    for kmer in kmer_papas[BQ][mtype][is_R1]:
                         print(BQ, mtype, is_R1, kmer, kmer_papas[BQ][mtype][is_R1][kmer], file=opts.output_file_kmerpapa)                   
         opts.output_file_kmerpapa.close()
     
