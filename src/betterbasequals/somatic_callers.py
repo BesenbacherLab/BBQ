@@ -157,7 +157,7 @@ class SomaticMutationCaller:
         self.min_base_qual_filter = min_base_qual_filter
         self.min_depth = min_depth
         self.max_depth = max_depth
-        self.radius = len(first(first(first(kmer_papa.values()).values()).keys()))//2
+        self.radius = len(first(first(first(first(kmer_papa.values()).values()).values()).keys()))//2
         self.prefix = prefix
         self.filter_variants = False
 
