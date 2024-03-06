@@ -485,10 +485,13 @@ class SomaticMutationCaller:
                         read_BQ = (read.base_qual, mem_read.base_qual)
                         BQ_pair = f'({read.base_qual},{mem_read.base_qual})'
                         is_reverse = read.is_reverse
+                        is_R1 = str(int(read.isR1))
                     else:
                         read_BQ = (mem_read.base_qual, read.base_qual)
                         BQ_pair = f'({mem_read.base_qual},{read.base_qual})'
-                        is_reverse = read.is_reverse
+                        ### TODO: I changed this from read ?? is it correct
+                        is_reverse = mem_read.is_reverse
+                        is_R1 = str(int(mem_read.isR1))
 
                     observed_BQs.add(BQ_pair)
                     enddist = max(read.enddist, mem_read.enddist)
@@ -499,11 +502,11 @@ class SomaticMutationCaller:
                     assert read.start < read.end
                     assert mem_read.start < mem_read.end
                     if fragment_id not in events[X]:
-                        events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, is_reverse)
+                        events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, is_reverse, is_R1)
                     else:
                         o_read_BQ = events[X][fragment_id][0]
                         if o_read_BQ < read_BQ:
-                            events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, is_reverse)
+                            events[X][fragment_id] = (read_BQ, read_MQ, enddist, has_indel, has_clip, NM, BQ_pair, is_reverse, is_R1)
 
                 else: # Mismatch
                     #if not no_update:
@@ -543,11 +546,11 @@ class SomaticMutationCaller:
             observed_BQs.add(str(read.base_qual))
             frag_id = (read.start, X)
             if frag_id not in events[X]:
-                events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual), read.is_reverse)
+                events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual), read.is_reverse, str(int(read.isR1)))
             else:
                 o_read_BQ = events[X][frag_id][0]
                 if o_read_BQ < read.base_qual:
-                    events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual), read.is_reverse)                        
+                    events[X][frag_id] = (read.base_qual, read.mapq, read.enddist, read.has_indel, read.has_clip, read.NM, str(read.base_qual), read.is_reverse, str(int(read.isR1)))                        
 
         if len(seen_alt) == 0:
             return {}, {}, n_mismatch, n_double, n_pos, n_neg, n_filtered, n_nonfiltered
@@ -562,34 +565,34 @@ class SomaticMutationCaller:
         # Do positional update of error rates:
         for BQ in observed_BQs:
             new_mut_probs[BQ] = defaultdict(dict)
-
             for from_base in relevant_bases:
-                for is_reverse in [True, False]:
-                    p_rest = 1.0
+                for is_reverse in [True, False]:       
                     stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer, is_reverse)
-                    for to_base in ['A', 'C', 'G', 'T']:
-                        if to_base == from_base:
-                            continue
-                        change_type, change_kmer = mut_type(from_base, to_base, ref_kmer, is_reverse)
+                    for is_R1 in ['0', '1']:
+                        p_rest = 1.0
+                        for to_base in ['A', 'C', 'G', 'T']:
+                            if to_base == from_base:
+                                continue
+                            change_type, change_kmer = mut_type(from_base, to_base, ref_kmer, is_reverse)
+                        
+                            p_prior = self.mut_probs[BQ][change_type][is_R1][change_kmer]
 
-                        p_prior = self.mut_probs[BQ][change_type][change_kmer]
+                            a = p_prior * self.prior_N
+                            b = self.prior_N - a
 
-                        a = p_prior * self.prior_N
-                        b = self.prior_N - a
+                            if self.no_update or from_base != ref:
+                                p_posterior = a/(a + b)
+                            else:
+                                #TODO: Try not splitting on to_base.
+                                p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
+                            p_rest -= p_posterior
 
-                        if self.no_update or from_base != ref:
-                            p_posterior = a/(a + b)
-                        else:
-                            #TODO: Try not splitting on to_base.
-                            p_posterior = (a + n_mismatch[to_base])/(a + b + n_double[to_base])
-                        p_rest -= p_posterior
+                            assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
+                            #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
+                            new_mut_probs[BQ][change_type][is_R1][change_kmer] = p2phred(p_posterior)
 
-                        assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
-                        #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
-                        new_mut_probs[BQ][change_type][change_kmer] = p2phred(p_posterior)
-
-                    assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
-                    new_mut_probs[BQ][stay_type][stay_kmer] = p2phred(p_rest)    
+                        assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
+                        new_mut_probs[BQ][stay_type][is_R1][stay_kmer] = p2phred(p_rest)    
 
 
         posterior_base_probs = {}
@@ -598,11 +601,11 @@ class SomaticMutationCaller:
 
         for A in seen_alt:
             posterior_base_probs[A] = []
-            for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ, is_reverse in events[A].values():
+            for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ, is_reverse, is_R1 in events[A].values():
                 muttype_from_A, kmer_from_A = mut_type(A, A, ref_kmer, is_reverse)
                 muttype_from_R, kmer_from_R = mut_type(R, A, ref_kmer, is_reverse)
-                posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][kmer_from_A]
-                posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][kmer_from_R]
+                posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][is_R1][kmer_from_A]
+                posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][is_R1][kmer_from_R]
 
                 posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
                 #if A==X:
@@ -612,11 +615,11 @@ class SomaticMutationCaller:
                     str_BQ = f'{BQ1}/{BQ2}'                    
                 BQs[A].append((read_BQ, posterior_from_R, enddist, has_indel, has_clip, NM, int(is_reverse), str_BQ))
 
-        for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ, is_reverse in events[R].values():
+        for read_BQ, read_MQ, enddist, has_indel, has_clip, NM, str_BQ, is_reverse, is_R1 in events[R].values():
             muttype_from_A, kmer_from_A = mut_type(A, R, ref_kmer, is_reverse)
             muttype_from_R, kmer_from_R = mut_type(R, R, ref_kmer, is_reverse)
-            posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][kmer_from_A]
-            posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][kmer_from_R]
+            posterior_from_A = new_mut_probs[str_BQ][muttype_from_A][is_R1][kmer_from_A]
+            posterior_from_R = new_mut_probs[str_BQ][muttype_from_R][is_R1][kmer_from_R]
             for A in seen_alt:
                 posterior_base_probs[A].append((posterior_from_A, posterior_from_R, read_MQ))
                 #if A==X:

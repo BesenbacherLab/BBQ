@@ -318,13 +318,15 @@ def read_kmers(opts):
 def read_kmer_papas(opts):
     kmer_papas = {}
     for line in opts.input_file_kmerpapa:
-        bqual, mtype, kmer, p_error = line.split()
+        bqual, mtype, is_R1, kmer, p_error = line.split()
         p_error = float(p_error)
         if bqual not in kmer_papas:
             kmer_papas[bqual] = {}
         if mtype not in kmer_papas[bqual]:
             kmer_papas[bqual][mtype] = {}
-        kmer_papas[bqual][mtype][kmer] = p_error
+        if is_R1 not in kmer_papas[bqual][mtype]:
+            kmer_papas[bqual][mtype][is_R1] = {}
+        kmer_papas[bqual][mtype][is_R1][kmer] = p_error
     return kmer_papas
 
 def read_kmer_papas_for_test(opts):
@@ -342,14 +344,14 @@ def read_kmer_papas_for_test(opts):
     return kmer_papas
 
 
-def print_kmer_papas(opts, kmer_papas):
-    if not opts.output_file_kmerpapa is None:
-        for bqual in kmer_papas:
-            for mtype in kmer_papas[bqual]:
-                for pat in kmer_papas[bqual][mtype]:
-                    Q = kmer_papas[bqual][mtype][pat]
-                    print(bqual, mtype, pat, Q, file=opts.output_file_kmerpapa)
-        opts.output_file_kmerpapa.close()
+# def print_kmer_papas(opts, kmer_papas):
+#     if not opts.output_file_kmerpapa is None:
+#         for bqual in kmer_papas:
+#             for mtype in kmer_papas[bqual]:
+#                 for pat in kmer_papas[bqual][mtype]:
+#                     Q = kmer_papas[bqual][mtype][pat]
+#                     print(bqual, mtype, pat, Q, file=opts.output_file_kmerpapa)
+#         opts.output_file_kmerpapa.close()
 
 
 def print_kmer_counts(opts, event_kmers):
