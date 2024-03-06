@@ -100,12 +100,12 @@ for line in sys.stdin:
             else:
                 max_oldBQ = oldBQ
             if kmer2pattern is None:
-                counter[(muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'])] += 1
+                counter[(sym_muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'])] += 1
             else:
                 if kmer not in kmer2pattern[max_oldBQ][muttype]:
                     kmer = reverse_complement(kmer)
                 pattern = kmer2pattern[max_oldBQ][muttype][kmer]
-                counter[(muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], pattern)] += 1
+                counter[(sym_muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], pattern)] += 1
 
 columns = [
     'sym_muttype',
