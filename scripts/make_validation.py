@@ -82,6 +82,7 @@ for line in sys.stdin:
         oldBQs = list_vals(D['oldBQ'])
         newBQs = [str(int(float(x))) for x in list_vals(D['newBQ'])]
         strands = list_vals(D['strand'])
+        readNum = list_vals(D['readNum'])
         kmer = D['kmer']
         
         assert(len(oldBQs)==len(newBQs))
@@ -100,12 +101,12 @@ for line in sys.stdin:
             else:
                 max_oldBQ = oldBQ
             if kmer2pattern is None:
-                counter[(sym_muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'])] += 1
+                counter[(sym_muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], readNum[i])] += 1
             else:
                 if kmer not in kmer2pattern[max_oldBQ][muttype]:
                     kmer = reverse_complement(kmer)
                 pattern = kmer2pattern[max_oldBQ][muttype][kmer]
-                counter[(sym_muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], pattern)] += 1
+                counter[(sym_muttype, nonsym_muttype, oldBQs[i], max_oldBQ, newBQs[i], validation, D['n_mismatch'], D['N_A_37'], readNum[i], pattern)] += 1
 
 columns = [
     'sym_muttype',
@@ -116,6 +117,7 @@ columns = [
     'validation',
     'n_mismatch',
     'NA37',
+    'readNum',
 ]
 
 if not kmer2pattern is None:
