@@ -568,11 +568,12 @@ class SomaticMutationCaller:
             for from_base in relevant_bases:
                 for is_reverse in [True, False]:       
                     stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer, is_reverse)                    
-                    new_mut_probs[BQ][stay_type] = {}#defaultdict(dict)
+                    if stay_type not in new_mut_probs[BQ]:
+                        new_mut_probs[BQ][stay_type] = {}#defaultdict(dict)
                     for is_R1 in ['0', '1']:
                         if is_R1 not in new_mut_probs[BQ][stay_type]:
                             new_mut_probs[BQ][stay_type][is_R1] = {}
-                            
+
                         p_rest = 1.0
                         for to_base in ['A', 'C', 'G', 'T']:
                             if to_base == from_base:
@@ -584,7 +585,7 @@ class SomaticMutationCaller:
                                 new_mut_probs[BQ][change_type][is_R1] = {}
                         
                             p_prior = self.mut_probs[BQ][change_type][is_R1][change_kmer]
-
+                            #print(p_prior)
                             a = p_prior * self.prior_N
                             b = self.prior_N - a
 
@@ -598,7 +599,9 @@ class SomaticMutationCaller:
                             assert 0.0 < p_posterior < 1.0, f"posterior error probability outside bounds: {p_posterior}"
                             #print(ref, BQ, from_base, to_base, p_posterior, n_mismatch[to_base], n_double[to_base])
                             new_mut_probs[BQ][change_type][is_R1][change_kmer] = p2phred(p_posterior)
-
+                        
+                        if p_rest < 0.001:
+                            print(BQ, stay_type, is_R1, stay_kmer)
                         assert 0.0 < p_rest < 1.0, f"no change posterior error probability outside bounds: {p_rest}"
                         new_mut_probs[BQ][stay_type][is_R1][stay_kmer] = p2phred(p_rest)    
 
