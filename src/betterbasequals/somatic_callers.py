@@ -564,20 +564,24 @@ class SomaticMutationCaller:
 
         # Do positional update of error rates:
         for BQ in observed_BQs:
-            new_mut_probs[BQ] = defaultdict(dict)
+            new_mut_probs[BQ] = {}#defaultdict(dict)
             for from_base in relevant_bases:
                 for is_reverse in [True, False]:       
-                    stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer, is_reverse)
-                    
-                    new_mut_probs[BQ][stay_type] = defaultdict(dict)
+                    stay_type, stay_kmer = mut_type(from_base, from_base, ref_kmer, is_reverse)                    
+                    new_mut_probs[BQ][stay_type] = {}#defaultdict(dict)
                     for is_R1 in ['0', '1']:
+                        if is_R1 not in new_mut_probs[BQ][stay_type]:
+                            new_mut_probs[BQ][stay_type][is_R1] = {}
+                            
                         p_rest = 1.0
                         for to_base in ['A', 'C', 'G', 'T']:
                             if to_base == from_base:
                                 continue
                             change_type, change_kmer = mut_type(from_base, to_base, ref_kmer, is_reverse)
                             if change_type not in new_mut_probs[BQ]:
-                                new_mut_probs[BQ][change_type] = defaultdict(dict)
+                                new_mut_probs[BQ][change_type] = {}
+                            if is_R1 not in new_mut_probs[BQ][change_type]:
+                                new_mut_probs[BQ][change_type][is_R1] = {}
                         
                             p_prior = self.mut_probs[BQ][change_type][is_R1][change_kmer]
 
