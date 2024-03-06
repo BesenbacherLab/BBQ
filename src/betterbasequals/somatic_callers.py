@@ -322,7 +322,7 @@ class SomaticMutationCaller:
                     oldBQ_str = '[' + ','.join(x[-1] for x in BQs[A]) + ']'
                     newBQ = '[' +','.join(f'{x[1]:.1f}' for x in BQs[A]) + ']'
                     strand = '[' +','.join(str(x[-3]) for x in BQs[A]) + ']'
-                    Rnum = '[' +','.join(read_NO(x[-2]) for x in BQs[A]) + ']'
+                    Rnum = '[' +','.join(read_NO[x[-2]] for x in BQs[A]) + ']'
 
                     oldBQ = [x[0] for x in BQs[A]]
                     oldBQ.sort()
