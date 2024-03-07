@@ -283,7 +283,7 @@ class MutationCounterWFilter:
                 mut_type = f'{ref}->{allele}'
                 this_kmer = kmer
             #TODO: should this be for all categories?
-            if event_type in ['singleton', 'good_tuple'] and n_alleles[allele]>1:
+            if event_type in ['singleton', 'good_tuple', 'bad_tuple'] and n_alleles[allele]>1:
                 continue
             event_kmers[(event_type, base_qual, mut_type, int(is_R1), this_kmer)] += 1
 
