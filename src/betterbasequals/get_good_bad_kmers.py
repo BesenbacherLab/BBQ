@@ -206,20 +206,18 @@ class MutationCounterWFilter:
             # ):
             #     continue
 
-            if read.base_qual > 30:
-                n_alleles[read.allel] += 1
-
             # Look for read partner
             if read.query_name in reads_mem:
                 # found partner process read pair
                 mem_read = reads_mem.pop(read.query_name)
-                
+
                 if (not read.is_good(self.min_enddist, self.max_mismatch, self.mapq)) or (not mem_read.is_good(self.min_enddist, self.max_mismatch, self.mapq)):
                     continue
 
                 if read.allel == mem_read.allel:
+
                     event_list.append(('good', read.allel, read.base_qual, read.is_reverse, read.isR1))
-                    event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse, read.isR1))
+                    event_list.append(('good', mem_read.allel, mem_read.base_qual, mem_read.is_reverse, mem_read.isR1))
 
                     #Count good tuples two times: once for each strand!
                     #TODO: Why?
@@ -228,6 +226,7 @@ class MutationCounterWFilter:
 
                     if max(read.base_qual, mem_read.base_qual) > 30:
                         has_good.add(read.allel)
+                        n_alleles[read.allel] += 1
 
                 else:
                     if read.allel != ref and mem_read.allel == ref:# and mem_read.base_qual > 30:
@@ -245,6 +244,8 @@ class MutationCounterWFilter:
         
         # Handle reads without partner (ie. no overlap)
         for read in reads_mem.values():
+            if read.base_qual > 30:
+                n_alleles[read.allel] += 1
             if read.is_good(self.min_enddist, self.max_mismatch, self.mapq):
                 event_list.append(('singleton', read.allel, read.base_qual, read.is_reverse, read.isR1))
 
@@ -281,5 +282,8 @@ class MutationCounterWFilter:
             else:
                 mut_type = f'{ref}->{allele}'
                 this_kmer = kmer
+            #TODO: should this be for all categories?
+            if event_type in ['singleton', 'good_tuple'] and n_alleles[allele]>1:
+                continue
             event_kmers[(event_type, base_qual, mut_type, int(is_R1), this_kmer)] += 1
 
