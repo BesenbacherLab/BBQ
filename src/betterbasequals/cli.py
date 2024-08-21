@@ -8,7 +8,7 @@ from betterbasequals.somatic_callers import SomaticMutationCaller
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from betterbasequals.kmerpapa_utils import get_kmerpapa
-from betterbasequals.filter_calls import BBQFilter
+from betterbasequals.filter_calls importBBQFilter
 from math import sqrt
 
 def get_parser():
@@ -48,9 +48,9 @@ def get_parser():
     read_filter_parent = argparse.ArgumentParser(add_help=False)
     read_filter_parent.add_argument('--min_enddist', type=int, default=5, metavar="M",
         help="Ignore bases in the first M or last M positions in the read")
-    read_filter_parent.add_argument('--max_mismatch', type=int, default=1, metavar="M",
+    read_filter_parent.add_argument('--max_mismatch', type=int, default=2, metavar="M",
         help="Ignore alt reads if the read has more than M mismatches to the reference")
-    read_filter_parent.add_argument('--min_MQ', type=int, default=40,
+    read_filter_parent.add_argument('--min_MQ', type=int, default=50,
         help="Minimum base quality to considder")
     read_filter_parent.add_argument('--exclude_bed', type=str,
         help='Bed file with regions to exclude. Should be sorted by chrom (alphabetically) then pos (numrically).')
@@ -94,12 +94,12 @@ def get_parser():
     train_parent.add_argument('--estimated', type=str, default = 'single',
                               choices = ['single', 'double'])
     train_parent.add_argument('--mean_type', type=str, default = 'geometric',
-                              choices = ['geometric', 'harmonic'])
+                              choices = ['geometric', 'harmonic', 'arithmetic'])
     train_parent.add_argument(
-        '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10],
+        '-a', '--pseudo_counts', type=float, metavar='a', nargs='+', default = [1,10,30],
         help='Different pseudo count (alpha) values to test using cross validation')
     train_parent.add_argument(
-        '-c', '--penalty_values', type=float, metavar='c', nargs='+', default = [5,10,15,20],
+        '-c', '--penalty_values', type=float, metavar='c', nargs='+', default = [5,10,15,20,25,30,35],
         help='Different penalty values to test using cross validation.')
 
     # args for validating models:    
@@ -124,11 +124,11 @@ def get_parser():
     call_parent.add_argument('--outfile', type=argparse.FileType('w'), default=sys.stdout,
         help="output file")
     call_parent.add_argument('--method', type=str,
-        choices=['LR', 'LR_with_MQ', 'maxLR_with_MQ', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior'], default="LR",
+        choices=['LR', 'LR_with_MQ', 'maxLR_with_MQ', 'BF', 'BF_with_MQ', 'BF_with_MQ_and_Prior'], default="LR_with_MQ",
         help="Method used to calculate variant quality scores")
     call_parent.add_argument('--cutoff', type=float, default=None, metavar='Q',
         help="Only print variants with quality above Q.")
-    call_parent.add_argument('--prior_N', type=float, default=500,
+    call_parent.add_argument('--prior_N', type=float, default=50000,
         help="Weight (as sample size) of the kmer based prior on error rate.")
     call_parent.add_argument('--no_update',  action='store_true',
         help="Do not make bayesian update of error rate but use rate only estimated from kmers")
@@ -141,7 +141,7 @@ def get_parser():
     #call_parent.add_argument('--mean_type', type=str,
     #    choices=['arithmetric', 'geometric'], default="geometric",
     #    help="How to calculate the mean error probabilty of two matching overlapping alleles")
-    call_parent.add_argument('--max_NM_diff', type=int, default=1,
+    call_parent.add_argument('--max_NM_diff', type=int, default=2,
         help="Maximum allowed difference in median number of mismatches for reads with alt alleles compared to reads with ref alleles")
 
     count_parser = subparsers.add_parser('count', 
@@ -450,7 +450,6 @@ def run_get_kmerpapas(opts, event_kmers):
                     for kmer in kmer_papas[BQ][mtype]:
                         kmer_papas[BQ_pair][mtype][kmer] = min(kmer_papas[BQ][mtype][kmer] / rel_EQ, 0.25)
                 
-
             elif opts.estimated == "double":
                 kmer_papas[BQ][mtype] = {}
                 for kmer in kmer_papas[BQ_pair][mtype]:
@@ -477,8 +476,9 @@ def run_get_kmerpapas(opts, event_kmers):
                     elif opts.mean_type == 'harmonic':
                         kmer_papas[BQ_pair][mtype][kmer] = \
                             1.0/(((1.0/kmer_papas[BQ1_pair][mtype][kmer]) + (1.0/kmer_papas[BQ2_pair][mtype][kmer]))/2)
-
-                    #TODO: Should we try harmonic mean?
+                    elif opts.mean_type == 'arithmetric':
+                        kmer_papas[BQ_pair][mtype][kmer] = \
+                            (kmer_papas[BQ1_pair][mtype][kmer] + kmer_papas[BQ2_pair][mtype][kmer])/2
 
     if not opts.output_file_kmerpapa is None:
         for BQ in kmer_papas:
