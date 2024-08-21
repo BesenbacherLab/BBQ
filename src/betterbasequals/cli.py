@@ -138,9 +138,6 @@ def get_parser():
         help='Maximum number of times an alternative read is allowed to be seen in filer_bam')
     call_parent.add_argument("--pop_vcf", type=str,
         help='Population vcf with AF field.')
-    #call_parent.add_argument('--mean_type', type=str,
-    #    choices=['arithmetric', 'geometric'], default="geometric",
-    #    help="How to calculate the mean error probabilty of two matching overlapping alleles")
     call_parent.add_argument('--max_NM_diff', type=int, default=2,
         help="Maximum allowed difference in median number of mismatches for reads with alt alleles compared to reads with ref alleles")
 
@@ -476,7 +473,7 @@ def run_get_kmerpapas(opts, event_kmers):
                     elif opts.mean_type == 'harmonic':
                         kmer_papas[BQ_pair][mtype][kmer] = \
                             1.0/(((1.0/kmer_papas[BQ1_pair][mtype][kmer]) + (1.0/kmer_papas[BQ2_pair][mtype][kmer]))/2)
-                    elif opts.mean_type == 'arithmetric':
+                    elif opts.mean_type == 'arithmetic':
                         kmer_papas[BQ_pair][mtype][kmer] = \
                             (kmer_papas[BQ1_pair][mtype][kmer] + kmer_papas[BQ2_pair][mtype][kmer])/2
 
