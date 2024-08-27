@@ -8,7 +8,7 @@ from betterbasequals.somatic_callers import SomaticMutationCaller
 from betterbasequals.utils import *
 from betterbasequals import __version__
 from betterbasequals.kmerpapa_utils import get_kmerpapa
-from betterbasequals.filter_calls importBBQFilter
+from betterbasequals.filter_calls import BBQFilter
 from math import sqrt
 
 def get_parser():
