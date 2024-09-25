@@ -4,8 +4,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "betterbasequals"
-version = "0.1.0"
-description = "Calculates sample-specific base qualities using overlapping reads."
+version = "0.2.0"
+description = "SNV variant caller that uses discordant overlapping read pairs to calculate sample-specific base error rates."
 authors = ["Søren Besenbacher <besenbacher@clin.au.dk>"]
 license = "MIT License"
 readme = "README.md"
@@ -19,7 +19,8 @@ python = ">=3.8,<3.11"
 pysam = "^0.19.1"
 py2bit = "^0.3.0"
 pandas = {version = "^2.1.3", python = ">=3.9,<3.11"}
-kmerpapa = {git = "https://github.com/BesenbacherLab/kmerpapa.git", branch="main"}
+kmerpapa = "^0.2.4"
+jinja2 = "^3.1.4"
 
 [tool.poetry.dev-dependencies]
 # formatting, quality, tests
@@ -31,11 +32,14 @@ pytest-sugar = "^0.9.4"
 pytest-xdist = "^2.2.0"
 
 # tasks
-duty = "^0.6.0"
-git-changelog = "^0.4.2"
-httpx = "^0.16.1"
-jinja2-cli = "^0.7.0"
-toml = "^0.10.2"
+duty = "^1.4.2"
+
+#pip = "^21.3.1"
+#duty = "^0.6.0"
+#git-changelog = "^0.4.2"
+#httpx = "^0.16.1"
+#jinja2-cli = "^0.7.0"
+#toml = "^0.10.2"
 
 # docs
 mkdocs = "^1.1.2"
