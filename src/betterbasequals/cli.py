@@ -71,7 +71,7 @@ def get_parser():
 
     # args for training models:    
     train_parent = argparse.ArgumentParser(add_help=False)
-    train_parent.add_argument('--kmerpapa_method', type=str, default = "greedy",
+    train_parent.add_argument('--kmerpapa_method', type=str, default = "optimal",
         help='algorithm to use for calculating kmer-papas',
         choices=['greedy', 'optimal'])
     train_parent.add_argument('--correction_type', type=str, default = "bad_vs_no",
@@ -88,7 +88,7 @@ def get_parser():
         help='seed for numpy.random')
     train_parent.add_argument('--same_good', action='store_true')
     train_parent.add_argument('--subtract', action='store_true')
-    train_parent.add_argument('--EQ_pat', action='store_true')
+    train_parent.add_argument('--no_EQ_pat', action='store_true')
     train_parent.add_argument('--EQ_pat_alpha', type=float, default=2)
     train_parent.add_argument('--min1EQ', action='store_true')
     train_parent.add_argument('--estimated', type=str, default = 'single',
@@ -178,7 +178,6 @@ def get_parser():
         help = 'Train model to distinguish good and bad k-mers.',
         parents = [train_parent])
     train_only_parser.add_argument("--input_file_kmers", type=argparse.FileType('r'))
-    #train_only_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
 
     validate_only_parser = subparsers.add_parser('validate_only', 
         description = 'Print validation data.',
@@ -208,7 +207,6 @@ def get_parser():
         description = 'Apply a kmerpapa model to a set of kmer counts',
         help = 'Apply a kmerpapa model to a set of kmer counts')
     test_kmerpapa_parser.add_argument("--input_file_kmers", type=argparse.FileType('r'))
-    #test_kmerpapa_parser.add_argument("--input_file_bad", type=argparse.FileType('r'))
     test_kmerpapa_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
     test_kmerpapa_parser.add_argument('--correction_type', type=str, default = "bad_vs_no",
         help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
@@ -251,26 +249,6 @@ def run_get_good_and_bad_w_filter(opts):
     
     return event_kmers
     
-    #change format of dicts to nested dicts
-    # BQs = set(x[1] for x in event_kmers)
-    # good_kmers = {}
-    # bad_kmers = {}
-    # for BQ in BQs:
-    #     good_kmers[BQ] = {}
-    #     for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T', 'C->C', 'A->A'):
-    #         good_kmers[BQ][mtype] = defaultdict(int)
-    #     bad_kmers[BQ] = {}
-    #     for mtype in ('A->C', 'A->G', 'A->T', 'C->A', 'C->G', 'C->T'):
-    #         bad_kmers[BQ][mtype] = defaultdict(int)
-
-    # for tup, count in event_kmers.items():
-    #     event_type, BQ, mtype, kmer = tup
-    #     if event_type =='good':
-    #         good_kmers[BQ][mtype][kmer] = count
-    #     elif event_type == 'bad':
-    #         bad_kmers[BQ][mtype][kmer] = count
-    # return good_kmers, bad_kmers
-
 
 def run_get_kmerpapas(opts, event_kmers):
     if opts.verbosity > 0:
@@ -311,7 +289,7 @@ def run_get_kmerpapas(opts, event_kmers):
             kmer_papas[bqual][mtype] = {}    
             kmer_papas[BQ_pair][mtype] = {}
             
-            kmer_patterns[bqual][mtype] = kpp#list(kpp.keys())
+            kmer_patterns[bqual][mtype] = kpp
             for pat in kpp:
                 alpha, beta = kpp[pat]
                 p_error = min(0.25, alpha / (alpha + beta))
@@ -346,7 +324,7 @@ def run_get_kmerpapas(opts, event_kmers):
             elif opts.estimated == 'double':
                 BQest = BQ_pair
             
-            if opts.EQ_pat:
+            if not opts.no_EQ_pat:
                 total_single_mut = 0
                 total_single_nomut = 0
                 total_double_mut = 0
@@ -400,7 +378,7 @@ def run_get_kmerpapas(opts, event_kmers):
     #    opts.output_file_EQ.close()        
 
     if not opts.output_file_EQ is None:
-        if opts.EQ_pat:
+        if not opts.no_EQ_pat:
             print('BQ mutationtype pattern kmerpapa_alpha kmepapa_beta kmerpapa_rate single_mut single_nomut double_mut double_nomut single_EQ double_EQ subtract relative_EQ', file = opts.output_file_EQ)
 
 
@@ -419,14 +397,14 @@ def run_get_kmerpapas(opts, event_kmers):
             else:
                 subtract = 0.0
 
-            if not opts.EQ_pat:
+            if opts.no_EQ_pat:
                 rel_EQ = (single_EQ[BQ][mtype] - subtract) / (double_EQ[BQ][mtype] - subtract)
                 if not opts.output_file_EQ is None:
                     print(BQ, mtype, single_EQ[BQ][mtype], double_EQ[BQ][mtype], subtract, rel_EQ, file = opts.output_file_EQ)
 
             if opts.estimated == "single":
                 kmer_papas[BQ_pair][mtype] = {}
-                if opts.EQ_pat:
+                if not opts.no_EQ_pat:
                     for pat in single_EQ[BQ][mtype]:
                         single_mut, single_nomut = single_EQ[BQ][mtype][pat]
                         double_mut, double_nomut =  double_EQ[BQ][mtype][pat]    
