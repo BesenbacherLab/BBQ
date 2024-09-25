@@ -7,10 +7,10 @@ from pathlib import Path
 from shutil import which
 from typing import List, Optional, Pattern
 
-import httpx
+#import httpx
 from duty import duty
-from git_changelog.build import Changelog, Version
-from jinja2.sandbox import SandboxedEnvironment
+#from git_changelog.build import Changelog, Version
+#from jinja2.sandbox import SandboxedEnvironment
 
 PY_SRC_PATHS = (Path(_) for _ in ("src", "tests", "duties.py", "docs/macros.py"))
 PY_SRC_LIST = tuple(str(_) for _ in PY_SRC_PATHS)
@@ -154,7 +154,7 @@ def release(ctx, version):
         ctx.run("git push --tags", title="Pushing tags", pty=False)
         ctx.run("poetry build", title="Building dist/wheel", pty=PTY)
         ctx.run("poetry publish", title="Publishing version", pty=PTY)
-        docs_deploy.run()  # type: ignore
+        #docs_deploy.run()  # type: ignore
 
 
 @duty(silent=True)
