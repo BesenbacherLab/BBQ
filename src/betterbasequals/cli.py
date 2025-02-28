@@ -22,18 +22,20 @@ def get_parser():
         prog="bbq",
         description='''
         Calculates sample-specific base qualities using overlapping reads.
-        ''')
+        ''',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        )
 
     # top level args:
     parser.add_argument("--verbosity", type=int, default=1)
     parser.add_argument('-V', '--version', action='version', version=f'%(prog)s {__version__}')
 
-    subparsers = parser.add_subparsers(dest='command', #help='commands',
-        title="required commands",
+    subparsers = parser.add_subparsers(dest='command',
+        title="commands",
         help='Select one of:')
 
     # args bam file:
-    bam_parent = argparse.ArgumentParser(add_help=False)
+    bam_parent = argparse.ArgumentParser(add_help=False, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bam_parent.add_argument("--bam_file", required=True,
         help="bam file")
     bam_parent.add_argument("--twobit_file", required=True,
@@ -43,9 +45,9 @@ def get_parser():
 
     # args for filter bam file
     filter_parent = argparse.ArgumentParser(add_help=False)
-    filter_parent.add_argument("--filter_bam_file", help="bam file from blood")
+    filter_parent.add_argument("--filter_bam_file", help="filter bam file, variants present in this file will not be called")
     
-    read_filter_parent = argparse.ArgumentParser(add_help=False)
+    read_filter_parent = argparse.ArgumentParser(add_help=False, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     read_filter_parent.add_argument('--min_enddist', type=int, default=5, metavar="M",
         help="Ignore bases in the first M or last M positions in the read")
     read_filter_parent.add_argument('--max_mismatch', type=int, default=2, metavar="M",
@@ -57,8 +59,10 @@ def get_parser():
 
     # args for counting kmers:
     count_parent = argparse.ArgumentParser(add_help=False)
-    count_parent.add_argument("--output_file_kmers", type=argparse.FileType('w'))
-    count_parent.add_argument("--radius", type=int, default=3)
+    count_parent.add_argument("--output_file_kmers", type=argparse.FileType('w'),
+        help="file to save the kmer counts in")
+    count_parent.add_argument("--radius", type=int, default=3, 
+        help="number of bases around a position that should be considered")
     count_parent.add_argument('--min_depth', type=int, default=1,
         help="mminimum depth at a site to be considered as training data")
     count_parent.add_argument('--max_depth', type=int, default=5000,
@@ -77,7 +81,8 @@ def get_parser():
     train_parent.add_argument('--correction_type', type=str, default = "bad_vs_no",
         help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
         choices=["bad_vs_good", "bad_vs_no"])
-    train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'))
+    train_parent.add_argument("--output_file_kmerpapa", type=argparse.FileType('w'),
+        help="save kmerpapa model to file")
     train_parent.add_argument("--output_file_EQ", type=argparse.FileType('w'))
     train_parent.add_argument("--CVfile_prefix", type=str)
     train_parent.add_argument('-N', '--nfolds', type=int, metavar='N', default=2,
@@ -109,7 +114,6 @@ def get_parser():
     # args for validating models:    
     list_validate_parent = argparse.ArgumentParser(add_help=False)
     list_validate_parent.add_argument("--validation_list_file", help="file with list of true variants", required=True)
-
 
     # args for printing polished bam:    
     adjust_parent = argparse.ArgumentParser(add_help=False)
@@ -150,72 +154,83 @@ def get_parser():
     train_parser = subparsers.add_parser('train', 
         description='First run "count" then train model to distinguish good and bad k-mers.', 
         help = 'First run "count" then train model to distinguish good and bad k-mers.',
-        parents=[bam_parent, filter_parent, count_parent, train_parent, read_filter_parent])
+        parents=[bam_parent, filter_parent, count_parent, train_parent, read_filter_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     validate_parser = subparsers.add_parser('validate', 
         description = 'First run "count" and "train" then print validation data',
         help = 'First run "count" and "train" then print validation data',
-        parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent, read_filter_parent])
+        parents=[bam_parent, filter_parent, count_parent, train_parent, validate_parent, read_filter_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     list_validate_parser = subparsers.add_parser('list_validate', 
         description = 'First run "count" and "train" then print validation data',
         help = 'First run "count" and "train" then print validation data',
-        parents=[bam_parent, filter_parent, count_parent, train_parent, list_validate_parent, read_filter_parent])
+        parents=[bam_parent, filter_parent, count_parent, train_parent, list_validate_parent, read_filter_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-
-    adjust_parser = subparsers.add_parser('adjust', 
-        description = 'First run "count" and "train" then output bam with adjusted base qualities.', 
-        help = 'First run "count" and "train" then output bam with adjusted base qualities.', 
-        parents = [bam_parent, filter_parent, count_parent, train_parent, adjust_parent])
+    # adjust_parser = subparsers.add_parser('adjust', 
+    #     description = 'First run "count" and "train" then output bam with adjusted base qualities.', 
+    #     help = 'First run "count" and "train" then output bam with adjusted base qualities.', 
+    #     parents = [bam_parent, filter_parent, count_parent, train_parent, adjust_parent],
+    #     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     call_parser = subparsers.add_parser('call', 
         description = 'First run "count" and "train" then call variants', 
         help = 'First run "count" and "train" then call variants', 
-        parents = [bam_parent, count_parent, train_parent, call_parent, read_filter_parent])
+        parents = [bam_parent, filter_parent, count_parent, train_parent, call_parent, read_filter_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     train_only_parser = subparsers.add_parser('train_only', 
         description = 'Train model to distinguish good and bad k-mers.',
         help = 'Train model to distinguish good and bad k-mers.',
-        parents = [train_parent])
+        parents = [train_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     train_only_parser.add_argument("--input_file_kmers", type=argparse.FileType('r'))
 
     validate_only_parser = subparsers.add_parser('validate_only', 
         description = 'Print validation data.',
         help = 'Print validation data.', 
-        parents = [bam_parent, filter_parent, validate_parent]) 
+        parents = [bam_parent, filter_parent, validate_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter) 
     validate_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
 
     list_validate_only_parser = subparsers.add_parser('list_validate_only', 
         description = 'Print validation data.',
         help = 'Print validation data.', 
-        parents = [bam_parent, filter_parent, list_validate_parent]) 
+        parents = [bam_parent, filter_parent, list_validate_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter) 
     list_validate_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
 
-    adjust_only_parser = subparsers.add_parser('adjust_only', 
-        description = 'Output bam with adjusted base qualities.', 
-        help = 'Output bam with adjusted base qualities.',
-        parents = [bam_parent, adjust_parent])
-    adjust_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
+    # adjust_only_parser = subparsers.add_parser('adjust_only', 
+    #     description = 'Output bam with adjusted base qualities.', 
+    #     help = 'Output bam with adjusted base qualities.',
+    #     parents = [bam_parent, adjust_parent],
+    #     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    # adjust_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
 
     call_only_parser = subparsers.add_parser('call_only', 
         description = 'Call variants',
         help = 'Call variants',
-        parents=[bam_parent, filter_parent, call_parent, read_filter_parent])
+        parents=[bam_parent, filter_parent, call_parent, read_filter_parent],
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     call_only_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
     
-    test_kmerpapa_parser = subparsers.add_parser('test_kmerpapa', 
-        description = 'Apply a kmerpapa model to a set of kmer counts',
-        help = 'Apply a kmerpapa model to a set of kmer counts')
-    test_kmerpapa_parser.add_argument("--input_file_kmers", type=argparse.FileType('r'))
-    test_kmerpapa_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
-    test_kmerpapa_parser.add_argument('--correction_type', type=str, default = "bad_vs_no",
-        help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
-        choices=["bad_vs_good", "bad_vs_no"])
-    test_kmerpapa_parser.add_argument('--same_good', action='store_true')
+    # test_kmerpapa_parser = subparsers.add_parser('test_kmerpapa', 
+    #     description = 'Apply a kmerpapa model to a set of kmer counts',
+    #     help = 'Apply a kmerpapa model to a set of kmer counts',
+    #     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    # test_kmerpapa_parser.add_argument("--input_file_kmers", type=argparse.FileType('r'))
+    # test_kmerpapa_parser.add_argument("--input_file_kmerpapa", type=argparse.FileType('r'))
+    # test_kmerpapa_parser.add_argument('--correction_type', type=str, default = "bad_vs_no",
+    #     help='should we compare bad variants to "good variants"(SNVs) or to "no variant" (homozygous ref sites)',
+    #     choices=["bad_vs_good", "bad_vs_no"])
+    # test_kmerpapa_parser.add_argument('--same_good', action='store_true')
 
     filter_calls_parser = subparsers.add_parser('filter_calls', 
         description = 'Filter PASS calls based on coverage quantiles',
-        help = 'Filter PASS calls based on coverage quantiles')
+        help = 'Filter PASS calls based on coverage quantiles',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     filter_calls_parser.add_argument('--vcf_file', required=True,
         help='input VCF file')
     filter_calls_parser.add_argument('--outfile',  type=argparse.FileType('w'), default=sys.stdout,
@@ -666,8 +681,8 @@ def main(args = None):
         run_list_validation(opts, kmer_papas)
     elif opts.command in ['call', 'call_only']:
         run_call(opts, kmer_papas)
-    elif opts.command in ['adjust', 'adjust_only']:
-        run_adjust(opts, kmer_papas)
+    #elif opts.command in ['adjust', 'adjust_only']:
+    #    run_adjust(opts, kmer_papas)
     #elif opts.command == 'test_kmerpapa':
     #    run_test_kmerpapas(opts, kmer_papas, event_kmers)
     elif opts.command == 'filter_calls':
