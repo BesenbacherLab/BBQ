@@ -142,13 +142,12 @@ class MutationCounterWFilter:
     def handle_pileup(self, pileupcolumn, event_kmers, major_allele = None):
         ref_pos = pileupcolumn.reference_pos
         chrom = pileupcolumn.reference_name
-        if ref_pos%10000 ==0:
-            eprint(f"{chrom}:{ref_pos}")    
+        #if ref_pos%10000 ==0:
+        #    eprint(f"{chrom}:{ref_pos}")    
 
         if not self.bed is None and self.bed.query(chrom, ref_pos):
             return
-        #if not self.bed_query_func(chrom, ref_pos):
-        #    continue
+
         if ref_pos - self.radius < 0:
             return 
 
