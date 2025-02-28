@@ -355,7 +355,7 @@ def print_kmer_counts(opts, event_kmers):
     if not opts.output_file_kmers is None:
         for tup, count in event_kmers.items():
             print(" ".join(str(x) for x in tup), count, file = opts.output_file_kmers)
-    opts.output_file_kmers.close()
+        opts.output_file_kmers.close()
 
 
 # def print_good_and_bad(opts, good_kmers, bad_kmers):
