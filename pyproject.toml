@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "betterbasequals"
-version = "0.2.0"
+version = "0.3.0"
 description = "SNV variant caller that uses discordant overlapping read pairs to calculate sample-specific base error rates."
 authors = ["Søren Besenbacher <besenbacher@clin.au.dk>"]
 license = "MIT License"
